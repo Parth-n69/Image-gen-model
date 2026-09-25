@@ -2,3 +2,4 @@ flask
 flask-cors
 requests
 python-dotenv
+huggingface_hub

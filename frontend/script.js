@@ -12,8 +12,51 @@
   const generatedImg  = document.getElementById("generated-image");
   const downloadBtn   = document.getElementById("download-btn");
   const newBtn        = document.getElementById("new-btn");
+  const creditsEl     = document.getElementById("credits-remaining");
 
-  const API_URL = "http://127.0.0.1:5000/generate";
+  const API_URL = "http://127.0.0.1:5000";
+
+  // ── Fetch initial credit status on load ─────────────────────
+  fetchCredits();
+
+  async function fetchCredits() {
+    try {
+      const res = await fetch(`${API_URL}/status`);
+      if (res.ok) {
+        const data = await res.json();
+        updateCreditsUI(data.remaining, data.daily_limit);
+      }
+    } catch {
+      // Backend might not be running yet — silently ignore
+    }
+  }
+
+  function updateCreditsUI(remaining, total) {
+    if (!creditsEl) return;
+
+    creditsEl.textContent = `${remaining} / ${total} generations remaining today`;
+
+    // Update visual state
+    creditsEl.classList.remove("credits-ok", "credits-low", "credits-depleted");
+    if (remaining === 0) {
+      creditsEl.classList.add("credits-depleted");
+      lockOutUI();
+    } else if (remaining <= 1) {
+      creditsEl.classList.add("credits-low");
+    } else {
+      creditsEl.classList.add("credits-ok");
+    }
+  }
+
+  function lockOutUI() {
+    generateBtn.disabled = true;
+    promptInput.disabled = true;
+    showStatus(
+      "🔒 Your daily token has expired. You have used all 4 free generations for today. Please come back tomorrow!",
+      "error",
+      false
+    );
+  }
 
   // ── Character counter ───────────────────────────────────────
   promptInput.addEventListener("input", () => {
@@ -45,14 +88,14 @@
     // Lock UI
     setLoading(true);
     showStatus(
-      "Generating your image… This may take 20-30 seconds on a cold start.",
+      "Generating your image… This may take 15-30 seconds.",
       "loading",
       true
     );
     resultSection.classList.add("hidden");
 
     try {
-      const res = await fetch(API_URL, {
+      const res = await fetch(`${API_URL}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
@@ -67,6 +110,13 @@
         return;
       }
 
+      // Handle token expired (429)
+      if (res.status === 429 || data.code === "TOKEN_EXPIRED") {
+        updateCreditsUI(0, data.daily_limit || 4);
+        lockOutUI();
+        return;
+      }
+
       if (!res.ok) {
         const message = data.error || `Server error (HTTP ${res.status})`;
         showStatus(message, "error", false);
@@ -77,6 +127,11 @@
       if (!data.image) {
         showStatus("Server returned a response with no image data.", "error", false);
         return;
+      }
+
+      // Update remaining credits
+      if (data.remaining !== undefined) {
+        updateCreditsUI(data.remaining, data.daily_limit || 4);
       }
 
       // Success — display image
@@ -127,7 +182,13 @@
     promptInput.value = "";
     charCount.textContent = "0 / 500";
     charCount.classList.remove("near-limit", "at-limit");
-    promptInput.focus();
+
+    // Re-check if still has credits
+    fetchCredits().then(() => {
+      if (!promptInput.disabled) {
+        promptInput.focus();
+      }
+    });
   });
 
   // ── Helpers ─────────────────────────────────────────────────

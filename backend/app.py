@@ -1,6 +1,7 @@
 import os
 import base64
 import io
+from datetime import date
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -12,25 +13,67 @@ app = Flask(__name__)
 CORS(app)
 
 HF_API_KEY = os.getenv("HF_API_KEY")
-HF_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
+HF_MODEL = "black-forest-labs/FLUX.1-schnell"
+
+# ── Daily rate-limiting config ─────────────────────────────────
+DAILY_LIMIT = 4
+
+# In-memory store: { "ip_address": { "date": "YYYY-MM-DD", "count": int } }
+usage_tracker = {}
+
+
+def _get_usage(ip):
+    """Return the usage record for an IP, resetting if the date has changed."""
+    today = date.today().isoformat()
+    record = usage_tracker.get(ip)
+
+    if record is None or record["date"] != today:
+        usage_tracker[ip] = {"date": today, "count": 0}
+
+    return usage_tracker[ip]
+
+
+@app.route("/status", methods=["GET"])
+def get_status():
+    """Return the remaining daily credits for the requesting IP."""
+    ip = request.remote_addr
+    record = _get_usage(ip)
+    remaining = max(0, DAILY_LIMIT - record["count"])
+
+    return jsonify({
+        "daily_limit": DAILY_LIMIT,
+        "used": record["count"],
+        "remaining": remaining,
+    }), 200
 
 
 @app.route("/generate", methods=["POST"])
 def generate_image():
-    """Generate an image from a text prompt using Hugging Face Inference API."""
+    """Generate an image from a text prompt using HF FLUX.1-schnell."""
 
-    # --- Validate request body ---
+    ip = request.remote_addr
+    record = _get_usage(ip)
+
+    # ── Check daily limit ──────────────────────────────────────
+    if record["count"] >= DAILY_LIMIT:
+        return jsonify({
+            "error": "Your daily token has expired. You have used all 4 free image generations for today. Please try again tomorrow.",
+            "code": "TOKEN_EXPIRED",
+            "remaining": 0,
+        }), 429
+
+    # ── Validate request body ──────────────────────────────────
     data = request.get_json(silent=True)
     if not data or not data.get("prompt", "").strip():
         return jsonify({"error": "Prompt is required and cannot be empty."}), 400
 
     prompt = data["prompt"].strip()
 
-    # --- Validate API key is configured ---
+    # ── Validate API key is configured ─────────────────────────
     if not HF_API_KEY:
         return jsonify({"error": "Server misconfiguration: Hugging Face API key is not set."}), 500
 
-    # --- Call Hugging Face Inference API via huggingface_hub ---
+    # ── Call Hugging Face via InferenceClient (auto-routes to correct provider) ──
     client = InferenceClient(token=HF_API_KEY)
 
     try:
@@ -50,6 +93,12 @@ def generate_image():
                 "error": "API key does not have sufficient permissions. Please update your token."
             }), 403
 
+        # Credits depleted
+        if "402" in error_msg or "payment" in error_msg.lower() or "credits" in error_msg.lower():
+            return jsonify({
+                "error": "Hugging Face credits depleted. Please add credits or upgrade to PRO."
+            }), 402
+
         # Connection errors
         if "connect" in error_msg.lower() or "resolve" in error_msg.lower():
             return jsonify({
@@ -58,7 +107,7 @@ def generate_image():
 
         return jsonify({"error": f"Image generation failed: {error_msg}"}), 500
 
-    # --- Encode image to base64 data URI ---
+    # ── Encode image to base64 data URI ────────────────────────
     try:
         buf = io.BytesIO()
         image.save(buf, format="PNG")
@@ -68,7 +117,15 @@ def generate_image():
     except Exception as exc:
         return jsonify({"error": f"Failed to process the generated image: {str(exc)}"}), 500
 
-    return jsonify({"image": data_uri}), 200
+    # ── Increment usage AFTER successful generation ────────────
+    record["count"] += 1
+    remaining = max(0, DAILY_LIMIT - record["count"])
+
+    return jsonify({
+        "image": data_uri,
+        "remaining": remaining,
+        "daily_limit": DAILY_LIMIT,
+    }), 200
 
 
 if __name__ == "__main__":
