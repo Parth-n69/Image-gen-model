@@ -1,10 +1,10 @@
 import os
 import base64
-
-import requests as http_requests
+import io
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
+from huggingface_hub import InferenceClient
 
 load_dotenv()
 
@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app)
 
 HF_API_KEY = os.getenv("HF_API_KEY")
-HF_MODEL_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+HF_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
 
 
 @app.route("/generate", methods=["POST"])
@@ -30,57 +30,40 @@ def generate_image():
     if not HF_API_KEY:
         return jsonify({"error": "Server misconfiguration: Hugging Face API key is not set."}), 500
 
-    # --- Call Hugging Face Inference API ---
-    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-    payload = {"inputs": prompt}
+    # --- Call Hugging Face Inference API via huggingface_hub ---
+    client = InferenceClient(token=HF_API_KEY)
 
     try:
-        response = http_requests.post(HF_MODEL_URL, headers=headers, json=payload, timeout=120)
-    except http_requests.exceptions.Timeout:
-        return jsonify({
-            "error": "The model is taking too long to respond. It may be loading (cold start). Please try again in 30-60 seconds."
-        }), 504
-    except http_requests.exceptions.ConnectionError:
-        return jsonify({"error": "Could not connect to the Hugging Face API. Check your internet connection."}), 502
-    except http_requests.exceptions.RequestException as exc:
-        return jsonify({"error": f"Unexpected request error: {str(exc)}"}), 500
+        image = client.text_to_image(prompt, model=HF_MODEL)
+    except Exception as exc:
+        error_msg = str(exc)
 
-    # --- Handle non-200 responses from HF ---
-    if response.status_code != 200:
-        # HF often returns JSON error bodies
-        try:
-            error_body = response.json()
-        except ValueError:
-            error_body = {"raw": response.text[:500]}
-
-        # Model loading / estimated_time scenario (503)
-        if response.status_code == 503:
-            estimated = ""
-            if isinstance(error_body, dict) and "estimated_time" in error_body:
-                estimated = f" Estimated wait: {int(error_body['estimated_time'])}s."
+        # Model loading / cold start
+        if "503" in error_msg or "loading" in error_msg.lower():
             return jsonify({
-                "error": f"The model is currently loading.{estimated} Please try again shortly."
+                "error": "The model is currently loading. Please try again in 30-60 seconds."
             }), 504
 
-        return jsonify({
-            "error": f"Hugging Face API error (HTTP {response.status_code}).",
-            "details": error_body,
-        }), response.status_code
+        # Permission / auth errors
+        if "403" in error_msg or "permission" in error_msg.lower():
+            return jsonify({
+                "error": "API key does not have sufficient permissions. Please update your token."
+            }), 403
 
-    # --- Validate response is actually an image ---
-    content_type = response.headers.get("Content-Type", "")
-    if "image" not in content_type:
-        # HF sometimes returns 200 with a JSON body (e.g. queued status)
-        try:
-            body = response.json()
-        except ValueError:
-            body = {"raw": response.text[:500]}
-        return jsonify({"error": "Expected an image but received a non-image response.", "details": body}), 502
+        # Connection errors
+        if "connect" in error_msg.lower() or "resolve" in error_msg.lower():
+            return jsonify({
+                "error": "Could not connect to the Hugging Face API. Check your internet connection."
+            }), 502
 
-    # --- Encode image bytes to base64 data URI ---
+        return jsonify({"error": f"Image generation failed: {error_msg}"}), 500
+
+    # --- Encode image to base64 data URI ---
     try:
-        image_bytes = response.content
-        b64_string = base64.b64encode(image_bytes).decode("utf-8")
+        buf = io.BytesIO()
+        image.save(buf, format="PNG")
+        buf.seek(0)
+        b64_string = base64.b64encode(buf.read()).decode("utf-8")
         data_uri = f"data:image/png;base64,{b64_string}"
     except Exception as exc:
         return jsonify({"error": f"Failed to process the generated image: {str(exc)}"}), 500
