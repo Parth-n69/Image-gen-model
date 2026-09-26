@@ -216,4 +216,31 @@
     const btnText = generateBtn.querySelector(".btn-text");
     btnText.textContent = loading ? "Generating…" : "Generate";
   }
+// Preset prompts
+const preset1 = document.getElementById('preset-1');
+const preset2 = document.getElementById('preset-2');
+const switchBackendBtn = document.getElementById('switch-backend');
+let useMock = false;
+
+preset1 && preset1.addEventListener('click', () => {
+  promptInput.value = 'A vibrant sunset over a futuristic cyberpunk city skyline';
+  const len = promptInput.value.length;
+  charCount.textContent = `${len} / 500`;
+  charCount.classList.toggle('near-limit', len >= 400 && len < 500);
+  charCount.classList.toggle('at-limit', len >= 500);
+});
+
+preset2 && preset2.addEventListener('click', () => {
+  promptInput.value = 'A detailed portrait of an elf wizard with glowing staff';
+  const len = promptInput.value.length;
+  charCount.textContent = `${len} / 500`;
+  charCount.classList.toggle('near-limit', len >= 400 && len < 500);
+  charCount.classList.toggle('at-limit', len >= 500);
+});
+
+switchBackendBtn && switchBackendBtn.addEventListener('click', () => {
+  useMock = !useMock;
+  switchBackendBtn.textContent = useMock ? 'Use Real Backend' : 'Use Mock Backend';
+});
+
 })();

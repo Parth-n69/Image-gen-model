@@ -43,24 +43,23 @@
       </div>
     </header>
 
-    <!-- Prompt Section -->
+    <!-- Chat container -->
+    <section class="chat-container" id="chat-container">
+      <!-- Messages will be injected here -->
+    </section>
+
+    <!-- Prompt & controls -->
     <section class="prompt-section">
       <div class="input-wrapper">
-        <input
-          type="text"
-          id="prompt-input"
-          placeholder="Describe the image you want to create…"
-          autocomplete="off"
-          maxlength="500"
-        />
+        <input type="text" id="prompt-input" placeholder="Describe the image you want to create…" autocomplete="off" maxlength="500" />
         <span id="char-count" class="char-count">0 / 500</span>
       </div>
-      <button id="generate-btn" type="button">
-        <span class="btn-text">Generate</span>
-        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-        </svg>
-      </button>
+      <div class="controls">
+        <button id="generate-btn" type="button" class="primary-btn">Generate</button>
+        <button id="preset-1" type="button" class="preset-btn">Sunset cityscape</button>
+        <button id="preset-2" type="button" class="preset-btn">Fantasy portrait</button>
+        <button id="switch-backend" type="button" class="switch-btn">Use Mock Backend</button>
+      </div>
     </section>
 
     <!-- Status Area -->
@@ -75,27 +74,15 @@
         <img id="generated-image" alt="AI generated image" />
       </div>
       <div class="result-actions">
-        <button id="download-btn" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Download PNG
-        </button>
-        <button id="new-btn" type="button" class="secondary-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="23 4 23 10 17 10"/>
-            <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
-          </svg>
-          New Image
-        </button>
+        <button id="download-btn" type="button" class="primary-btn">Download PNG</button>
+        <button id="new-btn" type="button" class="secondary-btn">New Image</button>
       </div>
     </section>
+  </main>
 
     <!-- Footer -->
     <footer class="footer">
-      <p>Powered by <strong>FLUX.1-schnell</strong> via Hugging Face · Built with Flask &amp; vanilla JS · 4 free images/day</p>
+      <p>Powered by <strong>FLUX.1-schnell</strong> via Hugging Face · Built with vanilla JS · 4 free images/day</p>
     </footer>
   </main>
 
