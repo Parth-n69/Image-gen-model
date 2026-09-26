@@ -3,6 +3,8 @@
 
   // ── CONFIG ────────────────────────────────────────────────
   const API_URL = "http://127.0.0.1:5000";
+  const HISTORY_KEY = "neuralcanvas_history";
+  const MAX_HISTORY = 50;
 
   // ── DOM REFS ──────────────────────────────────────────────
   const sidebar        = document.getElementById("sidebar");
@@ -19,24 +21,21 @@
   const sidebarHistory = document.getElementById("sidebar-history");
 
   // Preset buttons (sidebar + welcome chips)
-  const presets  = document.querySelectorAll("[data-prompt]");
-  const preset1  = document.getElementById("preset-1");
-  const preset2  = document.getElementById("preset-2");
+  const presets = document.querySelectorAll("[data-prompt]");
 
   // ── STATE ─────────────────────────────────────────────────
   let isGenerating = false;
-  let chatHistory  = []; // { role: "user"|"ai", text: string, image?: string }
 
   // ── INIT ──────────────────────────────────────────────────
   fetchCredits();
   autoResizeInput();
+  loadHistory();
 
   // ── SIDEBAR TOGGLE (MOBILE) ───────────────────────────────
   toggleSidebar?.addEventListener("click", () => {
     sidebar.classList.toggle("open");
   });
 
-  // Close sidebar when clicking main area on mobile
   document.getElementById("chat-main")?.addEventListener("click", (e) => {
     if (sidebar.classList.contains("open") && !sidebar.contains(e.target)) {
       sidebar.classList.remove("open");
@@ -47,7 +46,6 @@
   newChatBtn?.addEventListener("click", resetChat);
 
   function resetChat() {
-    chatHistory = [];
     chatMessages.innerHTML = "";
     chatMessages.appendChild(welcomeScreen);
     welcomeScreen.classList.remove("hidden");
@@ -133,9 +131,53 @@
     }
   }
 
+  // ── LOCALSTORAGE HISTORY ──────────────────────────────────
+  function saveHistoryEntry(prompt, imageDataUri) {
+    let history = [];
+    try {
+      history = JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+    } catch { /* ignore */ }
+
+    history.unshift({
+      prompt,
+      image: imageDataUri,
+      timestamp: Date.now(),
+    });
+
+    // Keep only the last MAX_HISTORY items
+    if (history.length > MAX_HISTORY) {
+      history = history.slice(0, MAX_HISTORY);
+    }
+
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    } catch (e) {
+      // If localStorage is full (base64 images are large), remove oldest entries
+      while (history.length > 1) {
+        history.pop();
+        try {
+          localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+          break;
+        } catch { /* keep trying */ }
+      }
+    }
+  }
+
+  function loadHistory() {
+    let history = [];
+    try {
+      history = JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+    } catch { /* ignore */ }
+
+    // Populate sidebar
+    sidebarHistory.innerHTML = "";
+    history.forEach(entry => {
+      addToSidebarHistory(entry.prompt, entry.image, entry.timestamp);
+    });
+  }
+
   // ── MESSAGE RENDERING ────────────────────────────────────
   function addMessage(role, content, opts = {}) {
-    // Hide welcome screen on first message
     welcomeScreen.classList.add("hidden");
 
     const msg = document.createElement("div");
@@ -143,7 +185,16 @@
 
     const avatar = document.createElement("div");
     avatar.classList.add("msg-avatar", role);
-    avatar.textContent = role === "user" ? "Y" : "✦";
+
+    if (role === "ai") {
+      const logoImg = document.createElement("img");
+      logoImg.src = "logo.jpg";
+      logoImg.alt = "AI";
+      logoImg.classList.add("avatar-logo");
+      avatar.appendChild(logoImg);
+    } else {
+      avatar.textContent = "Y";
+    }
 
     const body = document.createElement("div");
     body.classList.add("msg-body");
@@ -172,32 +223,13 @@
     }
 
     if (opts.image) {
-      const wrap = document.createElement("div");
-      wrap.classList.add("msg-image-wrap");
-      const img = document.createElement("img");
-      img.src = opts.image;
-      img.alt = content || "Generated image";
-      wrap.appendChild(img);
-      body.appendChild(wrap);
-
-      // Download button
-      const actions = document.createElement("div");
-      actions.classList.add("msg-actions");
-
-      const dlBtn = document.createElement("button");
-      dlBtn.classList.add("msg-action-btn");
-      dlBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Download`;
-      dlBtn.addEventListener("click", () => downloadImage(opts.image, content));
-      actions.appendChild(dlBtn);
-
-      body.appendChild(actions);
+      appendImageToBody(body, opts.image, content);
     }
 
     msg.appendChild(avatar);
     msg.appendChild(body);
     chatMessages.appendChild(msg);
 
-    // Scroll to bottom
     requestAnimationFrame(() => {
       chatScroll.scrollTop = chatScroll.scrollHeight;
     });
@@ -205,11 +237,31 @@
     return msg;
   }
 
+  function appendImageToBody(body, imageSrc, altText) {
+    const wrap = document.createElement("div");
+    wrap.classList.add("msg-image-wrap");
+    const img = document.createElement("img");
+    img.src = imageSrc;
+    img.alt = altText || "Generated image";
+    wrap.appendChild(img);
+    body.appendChild(wrap);
+
+    const actions = document.createElement("div");
+    actions.classList.add("msg-actions");
+
+    const dlBtn = document.createElement("button");
+    dlBtn.classList.add("msg-action-btn");
+    dlBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Download`;
+    dlBtn.addEventListener("click", () => downloadImage(imageSrc, altText));
+    actions.appendChild(dlBtn);
+
+    body.appendChild(actions);
+  }
+
   function replaceMessage(msgEl, role, content, opts = {}) {
     const body = msgEl.querySelector(".msg-body");
     if (!body) return;
 
-    // Keep the label, remove everything else
     const label = body.querySelector(".msg-label");
     body.innerHTML = "";
     if (label) body.appendChild(label);
@@ -227,22 +279,7 @@
     }
 
     if (opts.image) {
-      const wrap = document.createElement("div");
-      wrap.classList.add("msg-image-wrap");
-      const img = document.createElement("img");
-      img.src = opts.image;
-      img.alt = content || "Generated image";
-      wrap.appendChild(img);
-      body.appendChild(wrap);
-
-      const actions = document.createElement("div");
-      actions.classList.add("msg-actions");
-      const dlBtn = document.createElement("button");
-      dlBtn.classList.add("msg-action-btn");
-      dlBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Download`;
-      dlBtn.addEventListener("click", () => downloadImage(opts.image, content));
-      actions.appendChild(dlBtn);
-      body.appendChild(actions);
+      appendImageToBody(body, opts.image, content);
     }
 
     requestAnimationFrame(() => {
@@ -260,8 +297,6 @@
 
     // Add user message
     addMessage("user", prompt);
-    chatHistory.push({ role: "user", text: prompt });
-    addToSidebarHistory(prompt);
 
     // Clear input
     promptInput.value = "";
@@ -307,8 +342,13 @@
         updateCreditsUI(data.remaining, data.daily_limit || 4);
       }
 
-      replaceMessage(aiMsg, "ai", `Here's your image for "${prompt.slice(0, 60)}${prompt.length > 60 ? '…' : ''}"`, { image: data.image });
-      chatHistory.push({ role: "ai", text: prompt, image: data.image });
+      const shortPrompt = prompt.slice(0, 60) + (prompt.length > 60 ? "…" : "");
+      replaceMessage(aiMsg, "ai", `Here's your image for "${shortPrompt}"`, { image: data.image });
+
+      // Save to history (persists across refresh)
+      saveHistoryEntry(prompt, data.image);
+      // Update sidebar
+      addToSidebarHistory(prompt, data.image, Date.now(), true);
 
     } catch (err) {
       if (err instanceof TypeError) {
@@ -324,30 +364,98 @@
   }
 
   // ── SIDEBAR HISTORY ───────────────────────────────────────
-  function addToSidebarHistory(prompt) {
+  function addToSidebarHistory(prompt, imageSrc, timestamp, prepend = true) {
     const el = document.createElement("button");
-    el.classList.add("sidebar-item");
-    const shortText = prompt.length > 35 ? prompt.slice(0, 35) + "…" : prompt;
+    el.classList.add("sidebar-item", "history-item");
+
+    const shortText = prompt.length > 30 ? prompt.slice(0, 30) + "…" : prompt;
+    const timeStr = timestamp ? formatTime(timestamp) : "";
+
     el.innerHTML = `
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-      <span>${shortText}</span>
+      <div class="history-text">
+        <span class="history-prompt">${shortText}</span>
+        ${timeStr ? `<span class="history-time">${timeStr}</span>` : ""}
+      </div>
     `;
-    sidebarHistory.prepend(el);
+
+    // Clicking a history item shows it in chat
+    el.addEventListener("click", () => {
+      // Clear chat and show this conversation
+      chatMessages.innerHTML = "";
+      chatMessages.appendChild(welcomeScreen);
+      welcomeScreen.classList.add("hidden");
+
+      addMessage("user", prompt);
+      if (imageSrc) {
+        const shortP = prompt.slice(0, 60) + (prompt.length > 60 ? "…" : "");
+        addMessage("ai", `Here's your image for "${shortP}"`, { image: imageSrc });
+      }
+      sidebar.classList.remove("open");
+    });
+
+    if (prepend) {
+      sidebarHistory.prepend(el);
+    } else {
+      sidebarHistory.appendChild(el);
+    }
   }
 
-  // ── DOWNLOAD ──────────────────────────────────────────────
+  function formatTime(ts) {
+    const d = new Date(ts);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHr = Math.floor(diffMs / 3600000);
+    const diffDay = Math.floor(diffMs / 86400000);
+
+    if (diffMin < 1) return "Just now";
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return d.toLocaleDateString();
+  }
+
+  // ── DOWNLOAD (saves to Downloads folder) ──────────────────
   function downloadImage(dataUri, promptText) {
-    if (!dataUri || !dataUri.startsWith("data:")) return;
-    const link = document.createElement("a");
-    link.href = dataUri;
-    const safeName = (promptText || "image")
+    if (!dataUri) return;
+
+    // Create a proper filename
+    const safeName = (promptText || "NeuralCanvas_image")
       .replace(/[^a-zA-Z0-9 ]/g, "")
       .replace(/\s+/g, "_")
-      .slice(0, 60) || "generated_image";
-    link.download = `${safeName}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      .slice(0, 60) || "NeuralCanvas_image";
+    const fileName = `NeuralCanvas_${safeName}.png`;
+
+    // For data URIs, convert to blob for a cleaner download
+    if (dataUri.startsWith("data:")) {
+      const byteString = atob(dataUri.split(",")[1]);
+      const mimeString = dataUri.split(",")[0].split(":")[1].split(";")[0];
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], { type: mimeString });
+      const blobUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Cleanup blob URL after a short delay
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+    } else {
+      const link = document.createElement("a");
+      link.href = dataUri;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   }
 
 })();

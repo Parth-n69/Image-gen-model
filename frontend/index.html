@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="NeuralCanvas — AI Image Generator. Create stunning images from text prompts using FLUX.1-schnell." />
   <title>NeuralCanvas — AI Image Generator</title>
+  <link rel="icon" type="image/jpeg" href="logo.jpg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -16,12 +17,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-logo">
-        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
-          <rect width="32" height="32" rx="8" fill="url(#lg)" />
-          <path d="M9 22L16 10L23 22H9Z" fill="#fff" fill-opacity=".9"/>
-          <circle cx="16" cy="13" r="2.5" fill="#fff" fill-opacity=".7"/>
-          <defs><linearGradient id="lg" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#a855f7"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs>
-        </svg>
+        <img src="logo.jpg" alt="NeuralCanvas" class="logo-img" />
         <span>NeuralCanvas</span>
       </div>
       <button class="new-chat-btn" id="new-chat-btn" title="New chat">
@@ -41,7 +37,7 @@
 
     <div class="sidebar-section-label">History</div>
     <div class="sidebar-history" id="sidebar-history">
-      <!-- Dynamically populated -->
+      <!-- Dynamically populated from localStorage -->
     </div>
 
     <div class="sidebar-footer">
@@ -70,12 +66,7 @@
         <!-- Welcome message -->
         <div class="welcome-screen" id="welcome-screen">
           <div class="welcome-icon">
-            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" width="56" height="56">
-              <rect width="48" height="48" rx="14" fill="url(#wg)"/>
-              <path d="M13 33L24 15L35 33H13Z" fill="#fff" fill-opacity=".9"/>
-              <circle cx="24" cy="19" r="3.5" fill="#fff" fill-opacity=".7"/>
-              <defs><linearGradient id="wg" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#a855f7"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs>
-            </svg>
+            <img src="logo.jpg" alt="NeuralCanvas" class="welcome-logo-img" />
           </div>
           <h2>What image would you like to create?</h2>
           <p class="welcome-sub">Type a description below or pick a suggestion from the sidebar.</p>

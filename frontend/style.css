@@ -99,6 +99,21 @@ body {
   color: var(--text-primary);
 }
 
+.logo-img {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.welcome-logo-img {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow: 0 8px 32px rgba(168, 85, 247, 0.3);
+}
+
 .new-chat-btn {
   width: 36px;
   height: 36px;
@@ -155,6 +170,29 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebar-item.history-item {
+  align-items: flex-start;
+}
+
+.history-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.history-prompt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.83rem;
+}
+
+.history-time {
+  font-size: 0.68rem;
+  color: var(--text-muted);
 }
 
 .sidebar-history {
@@ -351,6 +389,15 @@ body {
 .msg-avatar.ai {
   background: rgba(255,255,255,0.08);
   color: var(--accent);
+  overflow: hidden;
+  padding: 0;
+}
+
+.avatar-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
 }
 
 .msg-body {
