@@ -1,24 +1,115 @@
 (() => {
   "use strict";
 
-  // ── DOM references ──────────────────────────────────────────
-  const promptInput   = document.getElementById("prompt-input");
-  const charCount     = document.getElementById("char-count");
-  const generateBtn   = document.getElementById("generate-btn");
-  const statusArea    = document.getElementById("status-area");
-  const spinner       = document.getElementById("spinner");
-  const statusText    = document.getElementById("status-text");
-  const resultSection = document.getElementById("result-section");
-  const generatedImg  = document.getElementById("generated-image");
-  const downloadBtn   = document.getElementById("download-btn");
-  const newBtn        = document.getElementById("new-btn");
-  const creditsEl     = document.getElementById("credits-remaining");
-
+  // ── CONFIG ────────────────────────────────────────────────
   const API_URL = "http://127.0.0.1:5000";
 
-  // ── Fetch initial credit status on load ─────────────────────
-  fetchCredits();
+  // ── DOM REFS ──────────────────────────────────────────────
+  const sidebar        = document.getElementById("sidebar");
+  const toggleSidebar  = document.getElementById("toggle-sidebar");
+  const newChatBtn     = document.getElementById("new-chat-btn");
+  const chatMessages   = document.getElementById("chat-messages");
+  const chatScroll     = document.getElementById("chat-scroll");
+  const welcomeScreen  = document.getElementById("welcome-screen");
+  const promptInput    = document.getElementById("prompt-input");
+  const sendBtn        = document.getElementById("send-btn");
+  const charCount      = document.getElementById("char-count");
+  const creditsEl      = document.getElementById("credits-remaining");
+  const creditsBadge   = document.getElementById("credits-badge");
+  const sidebarHistory = document.getElementById("sidebar-history");
 
+  // Preset buttons (sidebar + welcome chips)
+  const presets  = document.querySelectorAll("[data-prompt]");
+  const preset1  = document.getElementById("preset-1");
+  const preset2  = document.getElementById("preset-2");
+
+  // ── STATE ─────────────────────────────────────────────────
+  let isGenerating = false;
+  let chatHistory  = []; // { role: "user"|"ai", text: string, image?: string }
+
+  // ── INIT ──────────────────────────────────────────────────
+  fetchCredits();
+  autoResizeInput();
+
+  // ── SIDEBAR TOGGLE (MOBILE) ───────────────────────────────
+  toggleSidebar?.addEventListener("click", () => {
+    sidebar.classList.toggle("open");
+  });
+
+  // Close sidebar when clicking main area on mobile
+  document.getElementById("chat-main")?.addEventListener("click", (e) => {
+    if (sidebar.classList.contains("open") && !sidebar.contains(e.target)) {
+      sidebar.classList.remove("open");
+    }
+  });
+
+  // ── NEW CHAT ──────────────────────────────────────────────
+  newChatBtn?.addEventListener("click", resetChat);
+
+  function resetChat() {
+    chatHistory = [];
+    chatMessages.innerHTML = "";
+    chatMessages.appendChild(welcomeScreen);
+    welcomeScreen.classList.remove("hidden");
+    promptInput.value = "";
+    promptInput.style.height = "auto";
+    updateCharCount();
+    updateSendBtn();
+    fetchCredits();
+    promptInput.focus();
+    sidebar.classList.remove("open");
+  }
+
+  // ── PRESET PROMPTS ────────────────────────────────────────
+  presets.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const prompt = btn.dataset.prompt;
+      if (prompt && !isGenerating) {
+        promptInput.value = prompt;
+        autoResizeInput();
+        updateCharCount();
+        updateSendBtn();
+        handleGenerate();
+        sidebar.classList.remove("open");
+      }
+    });
+  });
+
+  // ── INPUT HANDLING ────────────────────────────────────────
+  promptInput.addEventListener("input", () => {
+    autoResizeInput();
+    updateCharCount();
+    updateSendBtn();
+  });
+
+  promptInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (!sendBtn.disabled) handleGenerate();
+    }
+  });
+
+  sendBtn.addEventListener("click", () => {
+    if (!sendBtn.disabled) handleGenerate();
+  });
+
+  function autoResizeInput() {
+    promptInput.style.height = "auto";
+    promptInput.style.height = Math.min(promptInput.scrollHeight, 150) + "px";
+  }
+
+  function updateCharCount() {
+    const len = promptInput.value.length;
+    charCount.textContent = `${len} / 500`;
+    charCount.classList.toggle("near-limit", len >= 400 && len < 500);
+    charCount.classList.toggle("at-limit", len >= 500);
+  }
+
+  function updateSendBtn() {
+    sendBtn.disabled = isGenerating || promptInput.value.trim().length === 0;
+  }
+
+  // ── CREDITS ───────────────────────────────────────────────
   async function fetchCredits() {
     try {
       const res = await fetch(`${API_URL}/status`);
@@ -27,72 +118,158 @@
         updateCreditsUI(data.remaining, data.daily_limit);
       }
     } catch {
-      // Backend might not be running yet — silently ignore
+      if (creditsEl) creditsEl.textContent = "Backend offline";
     }
   }
 
   function updateCreditsUI(remaining, total) {
     if (!creditsEl) return;
-
-    creditsEl.textContent = `${remaining} / ${total} generations remaining today`;
-
-    // Update visual state
-    creditsEl.classList.remove("credits-ok", "credits-low", "credits-depleted");
+    creditsEl.textContent = `${remaining}/${total} left today`;
+    creditsBadge.classList.remove("low", "depleted");
     if (remaining === 0) {
-      creditsEl.classList.add("credits-depleted");
-      lockOutUI();
+      creditsBadge.classList.add("depleted");
     } else if (remaining <= 1) {
-      creditsEl.classList.add("credits-low");
+      creditsBadge.classList.add("low");
+    }
+  }
+
+  // ── MESSAGE RENDERING ────────────────────────────────────
+  function addMessage(role, content, opts = {}) {
+    // Hide welcome screen on first message
+    welcomeScreen.classList.add("hidden");
+
+    const msg = document.createElement("div");
+    msg.classList.add("message");
+
+    const avatar = document.createElement("div");
+    avatar.classList.add("msg-avatar", role);
+    avatar.textContent = role === "user" ? "Y" : "✦";
+
+    const body = document.createElement("div");
+    body.classList.add("msg-body");
+
+    const label = document.createElement("div");
+    label.classList.add("msg-label");
+    label.textContent = role === "user" ? "You" : "NeuralCanvas";
+
+    body.appendChild(label);
+
+    if (opts.loading) {
+      const dots = document.createElement("div");
+      dots.classList.add("loading-dots");
+      dots.innerHTML = "<span></span><span></span><span></span>";
+      body.appendChild(dots);
+    } else if (opts.error) {
+      const err = document.createElement("div");
+      err.classList.add("msg-error");
+      err.textContent = content;
+      body.appendChild(err);
     } else {
-      creditsEl.classList.add("credits-ok");
+      const text = document.createElement("div");
+      text.classList.add("msg-text");
+      text.textContent = content;
+      body.appendChild(text);
     }
+
+    if (opts.image) {
+      const wrap = document.createElement("div");
+      wrap.classList.add("msg-image-wrap");
+      const img = document.createElement("img");
+      img.src = opts.image;
+      img.alt = content || "Generated image";
+      wrap.appendChild(img);
+      body.appendChild(wrap);
+
+      // Download button
+      const actions = document.createElement("div");
+      actions.classList.add("msg-actions");
+
+      const dlBtn = document.createElement("button");
+      dlBtn.classList.add("msg-action-btn");
+      dlBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Download`;
+      dlBtn.addEventListener("click", () => downloadImage(opts.image, content));
+      actions.appendChild(dlBtn);
+
+      body.appendChild(actions);
+    }
+
+    msg.appendChild(avatar);
+    msg.appendChild(body);
+    chatMessages.appendChild(msg);
+
+    // Scroll to bottom
+    requestAnimationFrame(() => {
+      chatScroll.scrollTop = chatScroll.scrollHeight;
+    });
+
+    return msg;
   }
 
-  function lockOutUI() {
-    generateBtn.disabled = true;
-    promptInput.disabled = true;
-    showStatus(
-      "🔒 Your daily token has expired. You have used all 4 free generations for today. Please come back tomorrow!",
-      "error",
-      false
-    );
+  function replaceMessage(msgEl, role, content, opts = {}) {
+    const body = msgEl.querySelector(".msg-body");
+    if (!body) return;
+
+    // Keep the label, remove everything else
+    const label = body.querySelector(".msg-label");
+    body.innerHTML = "";
+    if (label) body.appendChild(label);
+
+    if (opts.error) {
+      const err = document.createElement("div");
+      err.classList.add("msg-error");
+      err.textContent = content;
+      body.appendChild(err);
+    } else {
+      const text = document.createElement("div");
+      text.classList.add("msg-text");
+      text.textContent = content;
+      body.appendChild(text);
+    }
+
+    if (opts.image) {
+      const wrap = document.createElement("div");
+      wrap.classList.add("msg-image-wrap");
+      const img = document.createElement("img");
+      img.src = opts.image;
+      img.alt = content || "Generated image";
+      wrap.appendChild(img);
+      body.appendChild(wrap);
+
+      const actions = document.createElement("div");
+      actions.classList.add("msg-actions");
+      const dlBtn = document.createElement("button");
+      dlBtn.classList.add("msg-action-btn");
+      dlBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Download`;
+      dlBtn.addEventListener("click", () => downloadImage(opts.image, content));
+      actions.appendChild(dlBtn);
+      body.appendChild(actions);
+    }
+
+    requestAnimationFrame(() => {
+      chatScroll.scrollTop = chatScroll.scrollHeight;
+    });
   }
 
-  // ── Character counter ───────────────────────────────────────
-  promptInput.addEventListener("input", () => {
-    const len = promptInput.value.length;
-    charCount.textContent = `${len} / 500`;
-    charCount.classList.toggle("near-limit", len >= 400 && len < 500);
-    charCount.classList.toggle("at-limit", len >= 500);
-  });
-
-  // ── Enter key triggers generation ───────────────────────────
-  promptInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !generateBtn.disabled) {
-      e.preventDefault();
-      generateBtn.click();
-    }
-  });
-
-  // ── Generate button click ───────────────────────────────────
-  generateBtn.addEventListener("click", async () => {
+  // ── CORE GENERATION LOGIC ─────────────────────────────────
+  async function handleGenerate() {
     const prompt = promptInput.value.trim();
+    if (!prompt || isGenerating) return;
 
-    // Client-side validation
-    if (!prompt) {
-      showStatus("Please enter a prompt describing the image you want.", "error", false);
-      promptInput.focus();
-      return;
-    }
+    isGenerating = true;
+    updateSendBtn();
 
-    // Lock UI
-    setLoading(true);
-    showStatus(
-      "Generating your image… This may take 15-30 seconds.",
-      "loading",
-      true
-    );
-    resultSection.classList.add("hidden");
+    // Add user message
+    addMessage("user", prompt);
+    chatHistory.push({ role: "user", text: prompt });
+    addToSidebarHistory(prompt);
+
+    // Clear input
+    promptInput.value = "";
+    promptInput.style.height = "auto";
+    updateCharCount();
+
+    // Add loading AI message
+    const aiMsg = addMessage("ai", "", { loading: true });
 
     try {
       const res = await fetch(`${API_URL}/generate`, {
@@ -101,71 +278,69 @@
         body: JSON.stringify({ prompt }),
       });
 
-      // Safely parse JSON — backend might return non-JSON on rare errors
       let data;
       try {
         data = await res.json();
       } catch {
-        showStatus(`Server returned an invalid response (HTTP ${res.status}).`, "error", false);
+        replaceMessage(aiMsg, "ai", "Server returned an invalid response.", { error: true });
         return;
       }
 
-      // Handle token expired (429)
       if (res.status === 429 || data.code === "TOKEN_EXPIRED") {
         updateCreditsUI(0, data.daily_limit || 4);
-        lockOutUI();
+        replaceMessage(aiMsg, "ai", "🔒 Your daily free generations are used up. Please come back tomorrow!", { error: true });
         return;
       }
 
       if (!res.ok) {
-        const message = data.error || `Server error (HTTP ${res.status})`;
-        showStatus(message, "error", false);
+        replaceMessage(aiMsg, "ai", data.error || `Server error (HTTP ${res.status})`, { error: true });
         return;
       }
 
-      // Validate the image field exists
       if (!data.image) {
-        showStatus("Server returned a response with no image data.", "error", false);
+        replaceMessage(aiMsg, "ai", "Server returned a response with no image data.", { error: true });
         return;
       }
 
-      // Update remaining credits
+      // Success!
       if (data.remaining !== undefined) {
         updateCreditsUI(data.remaining, data.daily_limit || 4);
       }
 
-      // Success — display image
-      generatedImg.src = data.image;
-      generatedImg.alt = prompt;
-      resultSection.classList.remove("hidden");
-      showStatus("Image generated successfully!", "success", false);
+      replaceMessage(aiMsg, "ai", `Here's your image for "${prompt.slice(0, 60)}${prompt.length > 60 ? '…' : ''}"`, { image: data.image });
+      chatHistory.push({ role: "ai", text: prompt, image: data.image });
+
     } catch (err) {
-      // TypeError is thrown by fetch() when the network request itself fails
-      // (server not running, DNS failure, CORS blocked, etc.)
       if (err instanceof TypeError) {
-        showStatus(
-          "Cannot reach the backend server. Make sure Flask is running on http://127.0.0.1:5000",
-          "error",
-          false
-        );
+        replaceMessage(aiMsg, "ai", "Cannot reach the backend server. Make sure Flask is running on http://127.0.0.1:5000", { error: true });
       } else {
-        showStatus(`Unexpected error: ${err.message}`, "error", false);
+        replaceMessage(aiMsg, "ai", `Unexpected error: ${err.message}`, { error: true });
       }
     } finally {
-      setLoading(false);
+      isGenerating = false;
+      updateSendBtn();
+      promptInput.focus();
     }
-  });
+  }
 
-  // ── Download button ─────────────────────────────────────────
-  downloadBtn.addEventListener("click", () => {
-    const dataUri = generatedImg.src;
+  // ── SIDEBAR HISTORY ───────────────────────────────────────
+  function addToSidebarHistory(prompt) {
+    const el = document.createElement("button");
+    el.classList.add("sidebar-item");
+    const shortText = prompt.length > 35 ? prompt.slice(0, 35) + "…" : prompt;
+    el.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+      <span>${shortText}</span>
+    `;
+    sidebarHistory.prepend(el);
+  }
+
+  // ── DOWNLOAD ──────────────────────────────────────────────
+  function downloadImage(dataUri, promptText) {
     if (!dataUri || !dataUri.startsWith("data:")) return;
-
     const link = document.createElement("a");
     link.href = dataUri;
-    // Sanitise prompt for filename
-    const safeName = promptInput.value
-      .trim()
+    const safeName = (promptText || "image")
       .replace(/[^a-zA-Z0-9 ]/g, "")
       .replace(/\s+/g, "_")
       .slice(0, 60) || "generated_image";
@@ -173,74 +348,6 @@
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  });
-
-  // ── New Image button ────────────────────────────────────────
-  newBtn.addEventListener("click", () => {
-    resultSection.classList.add("hidden");
-    statusArea.classList.add("hidden");
-    promptInput.value = "";
-    charCount.textContent = "0 / 500";
-    charCount.classList.remove("near-limit", "at-limit");
-
-    // Re-check if still has credits
-    fetchCredits().then(() => {
-      if (!promptInput.disabled) {
-        promptInput.focus();
-      }
-    });
-  });
-
-  // ── Helpers ─────────────────────────────────────────────────
-
-  /**
-   * Show the status area with a message.
-   * @param {string} message
-   * @param {"loading"|"error"|"success"} type
-   * @param {boolean} showSpinner
-   */
-  function showStatus(message, type, showSpinner) {
-    statusArea.classList.remove("hidden", "error", "success");
-    if (type === "error") statusArea.classList.add("error");
-    if (type === "success") statusArea.classList.add("success");
-    spinner.classList.toggle("hidden", !showSpinner);
-    statusText.textContent = message;
   }
-
-  /**
-   * Toggle the loading state of the Generate button.
-   * @param {boolean} loading
-   */
-  function setLoading(loading) {
-    generateBtn.disabled = loading;
-    const btnText = generateBtn.querySelector(".btn-text");
-    btnText.textContent = loading ? "Generating…" : "Generate";
-  }
-// Preset prompts
-const preset1 = document.getElementById('preset-1');
-const preset2 = document.getElementById('preset-2');
-const switchBackendBtn = document.getElementById('switch-backend');
-let useMock = false;
-
-preset1 && preset1.addEventListener('click', () => {
-  promptInput.value = 'A vibrant sunset over a futuristic cyberpunk city skyline';
-  const len = promptInput.value.length;
-  charCount.textContent = `${len} / 500`;
-  charCount.classList.toggle('near-limit', len >= 400 && len < 500);
-  charCount.classList.toggle('at-limit', len >= 500);
-});
-
-preset2 && preset2.addEventListener('click', () => {
-  promptInput.value = 'A detailed portrait of an elf wizard with glowing staff';
-  const len = promptInput.value.length;
-  charCount.textContent = `${len} / 500`;
-  charCount.classList.toggle('near-limit', len >= 400 && len < 500);
-  charCount.classList.toggle('at-limit', len >= 500);
-});
-
-switchBackendBtn && switchBackendBtn.addEventListener('click', () => {
-  useMock = !useMock;
-  switchBackendBtn.textContent = useMock ? 'Use Real Backend' : 'Use Mock Backend';
-});
 
 })();
