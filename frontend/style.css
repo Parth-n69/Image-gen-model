@@ -643,12 +643,20 @@ body {
   transform: scale(0.98);
 }
 
-.input-footer {
+/* ── Input Toolbar (below the text area) ─────────────────── */
+.input-toolbar {
   max-width: var(--chat-max-w);
-  margin: 6px auto 0;
+  margin: 8px auto 0;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   padding: 0 6px;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .char-count {
@@ -663,6 +671,74 @@ body {
 .model-label {
   font-size: 0.68rem;
   color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Model Selector Dropdown ─────────────────────────────── */
+.model-selector-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  padding: 4px 4px 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.03);
+  transition: all var(--t-fast);
+  cursor: pointer;
+}
+
+.model-selector-wrap:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(168, 85, 247, 0.3);
+  box-shadow: 0 2px 12px rgba(168, 85, 247, 0.08);
+}
+
+.model-selector-wrap:hover .model-icon {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.model-selector-wrap:hover .model-select {
+  color: var(--text-primary);
+}
+
+.model-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.7;
+  transition: all var(--t-fast);
+  pointer-events: none;
+}
+
+.model-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.74rem;
+  font-weight: 500;
+  padding: 2px 22px 2px 2px;
+  cursor: pointer;
+  outline: none;
+  transition: color var(--t-fast);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+  white-space: nowrap;
+}
+
+.model-select:focus {
+  color: var(--text-primary);
+}
+
+.model-select option {
+  background: #2a2a2a;
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 0.82rem;
 }
 
 /* ============================================================

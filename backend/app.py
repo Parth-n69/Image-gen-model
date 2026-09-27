@@ -13,7 +13,15 @@ app = Flask(__name__)
 CORS(app)
 
 HF_API_KEY = os.getenv("HF_API_KEY")
-HF_MODEL = "black-forest-labs/FLUX.1-schnell"
+
+# ── Supported models ───────────────────────────────────────────
+MODELS = {
+    "flux-schnell": "black-forest-labs/FLUX.1-schnell",
+    "flux-dev":     "black-forest-labs/FLUX.1-dev",
+    "sd3.5":        "stabilityai/stable-diffusion-3.5-large",
+    "sdxl":         "stabilityai/stable-diffusion-xl-base-1.0",
+}
+DEFAULT_MODEL = "flux-schnell"
 
 # ── Daily rate-limiting config ─────────────────────────────────
 DAILY_LIMIT = 4
@@ -44,12 +52,13 @@ def get_status():
         "daily_limit": DAILY_LIMIT,
         "used": record["count"],
         "remaining": remaining,
+        "models": list(MODELS.keys()),
     }), 200
 
 
 @app.route("/generate", methods=["POST"])
 def generate_image():
-    """Generate an image from a text prompt using HF FLUX.1-schnell."""
+    """Generate an image from a text prompt using a selected HF model."""
 
     ip = request.remote_addr
     record = _get_usage(ip)
@@ -69,15 +78,25 @@ def generate_image():
 
     prompt = data["prompt"].strip()
 
+    # ── Validate model selection ───────────────────────────────
+    model_key = data.get("model", DEFAULT_MODEL).strip()
+    if model_key not in MODELS:
+        return jsonify({
+            "error": f"Invalid model '{model_key}'. Available models: {', '.join(MODELS.keys())}",
+            "available_models": list(MODELS.keys()),
+        }), 400
+
+    hf_model_id = MODELS[model_key]
+
     # ── Validate API key is configured ─────────────────────────
     if not HF_API_KEY:
         return jsonify({"error": "Server misconfiguration: Hugging Face API key is not set."}), 500
 
-    # ── Call Hugging Face via InferenceClient (auto-routes to correct provider) ──
+    # ── Call Hugging Face via InferenceClient ───────────────────
     client = InferenceClient(token=HF_API_KEY)
 
     try:
-        image = client.text_to_image(prompt, model=HF_MODEL)
+        image = client.text_to_image(prompt, model=hf_model_id)
     except Exception as exc:
         error_msg = str(exc)
 
@@ -125,6 +144,7 @@ def generate_image():
         "image": data_uri,
         "remaining": remaining,
         "daily_limit": DAILY_LIMIT,
+        "model": model_key,
     }), 200
 
 

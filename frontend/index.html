@@ -88,9 +88,20 @@
           <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
-      <div class="input-footer">
+      <div class="input-toolbar">
         <span class="char-count" id="char-count">0 / 500</span>
-        <span class="model-label">FLUX.1-schnell · Free tier</span>
+        <div class="toolbar-right">
+          <span class="model-label" id="model-label">FLUX Schnell · Free tier</span>
+          <div class="model-selector-wrap">
+            <svg class="model-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            <select id="model-select" class="model-select">
+              <option value="flux-schnell">FLUX Schnell (Fast)</option>
+              <option value="flux-dev">FLUX Dev (Quality)</option>
+              <option value="sd3.5">SD 3.5 Large</option>
+              <option value="sdxl">SDXL</option>
+            </select>
+          </div>
+        </div>
       </div>
     </div>
 

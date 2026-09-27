@@ -19,6 +19,17 @@
   const creditsEl      = document.getElementById("credits-remaining");
   const creditsBadge   = document.getElementById("credits-badge");
   const sidebarHistory = document.getElementById("sidebar-history");
+  const modelSelect    = document.getElementById("model-select");
+  const modelLabel     = document.getElementById("model-label");
+  const sidebarMeta    = document.querySelector(".sidebar-meta strong");
+
+  // Human-readable labels for each model value
+  const MODEL_LABELS = {
+    "flux-schnell": "FLUX Schnell",
+    "flux-dev":     "FLUX Dev",
+    "sd3.5":        "Stable Diffusion 3.5",
+    "sdxl":         "Stable Diffusion XL",
+  };
 
   // Preset buttons (sidebar + welcome chips)
   const presets = document.querySelectorAll("[data-prompt]");
@@ -30,6 +41,7 @@
   fetchCredits();
   autoResizeInput();
   loadHistory();
+  updateModelLabel();
 
   // ── SIDEBAR TOGGLE (MOBILE) ───────────────────────────────
   toggleSidebar?.addEventListener("click", () => {
@@ -41,6 +53,16 @@
       sidebar.classList.remove("open");
     }
   });
+
+  // ── MODEL SELECTOR ─────────────────────────────────────────
+  modelSelect?.addEventListener("change", updateModelLabel);
+
+  function updateModelLabel() {
+    const key = modelSelect?.value || "flux-schnell";
+    const name = MODEL_LABELS[key] || key;
+    if (modelLabel) modelLabel.textContent = `${name} · Free tier`;
+    if (sidebarMeta) sidebarMeta.textContent = name;
+  }
 
   // ── NEW CHAT ──────────────────────────────────────────────
   newChatBtn?.addEventListener("click", resetChat);
@@ -303,14 +325,18 @@
     promptInput.style.height = "auto";
     updateCharCount();
 
-    // Add loading AI message
-    const aiMsg = addMessage("ai", "", { loading: true });
+    // Determine selected model
+    const selectedModel = modelSelect?.value || "flux-schnell";
+    const modelName = MODEL_LABELS[selectedModel] || selectedModel;
+
+    // Add loading AI message with model name
+    const aiMsg = addMessage("ai", `Generating with ${modelName}…`, { loading: true });
 
     try {
       const res = await fetch(`${API_URL}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, model: selectedModel }),
       });
 
       let data;
