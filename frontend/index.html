@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="NeuralCanvas — AI Image Generator. Create stunning images from text prompts using FLUX.1-schnell." />
+  <meta name="description" content="NeuralCanvas — AI Image Generator. Create stunning images from text prompts using multiple AI models." />
   <title>NeuralCanvas — AI Image Generator</title>
   <link rel="icon" type="image/jpeg" href="logo.jpg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -45,7 +45,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span id="credits-remaining">Loading…</span>
       </div>
-      <div class="sidebar-meta">Powered by <strong>FLUX.1-schnell</strong></div>
+      <div class="sidebar-meta">Powered by <strong>FLUX Schnell</strong></div>
     </div>
   </aside>
 
@@ -63,13 +63,34 @@
     <!-- Chat messages scroll area -->
     <div class="chat-scroll" id="chat-scroll">
       <div class="chat-messages" id="chat-messages">
-        <!-- Welcome message -->
+        <!-- Welcome message + centered input -->
         <div class="welcome-screen" id="welcome-screen">
           <div class="welcome-icon">
             <img src="logo.jpg" alt="NeuralCanvas" class="welcome-logo-img" />
           </div>
           <h2>What image would you like to create?</h2>
           <p class="welcome-sub">Type a description below or pick a suggestion from the sidebar.</p>
+
+          <!-- Centered input (shown on welcome screen) -->
+          <div class="welcome-input-area" id="welcome-input-area">
+            <div class="input-bar-inner">
+              <textarea id="prompt-input" rows="1" placeholder="Describe the image you want to create…" maxlength="500"></textarea>
+              <button id="send-btn" class="send-btn" title="Generate image" disabled>
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+            <div class="input-toolbar">
+              <span class="char-count" id="char-count">0 / 500</span>
+              <div class="toolbar-right">
+                <button class="model-picker-btn" id="model-picker-btn" type="button">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                  <span id="model-picker-label">FLUX Schnell</span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="welcome-chips">
             <button class="chip" data-prompt="A vibrant sunset over a futuristic cyberpunk city skyline with neon lights">🌆 Sunset cityscape</button>
             <button class="chip" data-prompt="A detailed portrait of an elf wizard in a dark enchanted forest, cinematic lighting">🧙 Fantasy wizard</button>
@@ -80,32 +101,85 @@
       </div>
     </div>
 
-    <!-- Fixed bottom input bar -->
-    <div class="input-bar">
+    <!-- Fixed bottom input bar (shown when chat is active) -->
+    <div class="input-bar hidden" id="input-bar-bottom">
       <div class="input-bar-inner">
-        <textarea id="prompt-input" rows="1" placeholder="Describe the image you want to create…" maxlength="500"></textarea>
-        <button id="send-btn" class="send-btn" title="Generate image" disabled>
+        <textarea id="prompt-input-bottom" rows="1" placeholder="Describe the image you want to create…" maxlength="500"></textarea>
+        <button id="send-btn-bottom" class="send-btn" title="Generate image" disabled>
           <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
       <div class="input-toolbar">
-        <span class="char-count" id="char-count">0 / 500</span>
+        <span class="char-count" id="char-count-bottom">0 / 500</span>
         <div class="toolbar-right">
-          <span class="model-label" id="model-label">FLUX Schnell · Free tier</span>
-          <div class="model-selector-wrap">
-            <svg class="model-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-            <select id="model-select" class="model-select">
-              <option value="flux-schnell">FLUX Schnell (Fast)</option>
-              <option value="flux-dev">FLUX Dev (Quality)</option>
-              <option value="sd3.5">SD 3.5 Large</option>
-              <option value="sdxl">SDXL</option>
-            </select>
-          </div>
+          <button class="model-picker-btn" id="model-picker-btn-bottom" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            <span id="model-picker-label-bottom">FLUX Schnell</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
         </div>
       </div>
     </div>
 
   </main>
+
+  <!-- ─── MODEL PICKER MODAL ──────────────────────────────── -->
+  <div class="model-modal-overlay hidden" id="model-modal-overlay">
+    <div class="model-modal" id="model-modal">
+      <div class="model-modal-header">
+        <h3>Choose a Model</h3>
+        <button class="model-modal-close" id="model-modal-close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="model-modal-grid">
+        <button class="model-card active" data-model="flux-schnell">
+          <div class="model-card-icon">⚡</div>
+          <div class="model-card-info">
+            <div class="model-card-name">FLUX Schnell</div>
+            <div class="model-card-desc">Fast generation, good quality. Best for quick iterations.</div>
+          </div>
+          <span class="model-card-badge speed">Fast</span>
+          <div class="model-card-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+        </button>
+        <button class="model-card" data-model="flux-dev">
+          <div class="model-card-icon">✨</div>
+          <div class="model-card-info">
+            <div class="model-card-name">FLUX Dev</div>
+            <div class="model-card-desc">Higher quality output. Takes longer but produces stunning detail.</div>
+          </div>
+          <span class="model-card-badge quality">Quality</span>
+          <div class="model-card-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+        </button>
+        <button class="model-card" data-model="sd3.5">
+          <div class="model-card-icon">🎨</div>
+          <div class="model-card-info">
+            <div class="model-card-name">Stable Diffusion 3.5</div>
+            <div class="model-card-desc">Latest SD model with excellent prompt following and composition.</div>
+          </div>
+          <span class="model-card-badge quality">Quality</span>
+          <div class="model-card-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+        </button>
+        <button class="model-card" data-model="sdxl">
+          <div class="model-card-icon">🖼️</div>
+          <div class="model-card-info">
+            <div class="model-card-name">Stable Diffusion XL</div>
+            <div class="model-card-desc">Reliable and versatile. Great all-around image generation.</div>
+          </div>
+          <span class="model-card-badge speed">Balanced</span>
+          <div class="model-card-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

@@ -6,24 +6,7 @@
   const HISTORY_KEY = "neuralcanvas_history";
   const MAX_HISTORY = 50;
 
-  // ── DOM REFS ──────────────────────────────────────────────
-  const sidebar        = document.getElementById("sidebar");
-  const toggleSidebar  = document.getElementById("toggle-sidebar");
-  const newChatBtn     = document.getElementById("new-chat-btn");
-  const chatMessages   = document.getElementById("chat-messages");
-  const chatScroll     = document.getElementById("chat-scroll");
-  const welcomeScreen  = document.getElementById("welcome-screen");
-  const promptInput    = document.getElementById("prompt-input");
-  const sendBtn        = document.getElementById("send-btn");
-  const charCount      = document.getElementById("char-count");
-  const creditsEl      = document.getElementById("credits-remaining");
-  const creditsBadge   = document.getElementById("credits-badge");
-  const sidebarHistory = document.getElementById("sidebar-history");
-  const modelSelect    = document.getElementById("model-select");
-  const modelLabel     = document.getElementById("model-label");
-  const sidebarMeta    = document.querySelector(".sidebar-meta strong");
-
-  // Human-readable labels for each model value
+  // ── MODEL DATA ────────────────────────────────────────────
   const MODEL_LABELS = {
     "flux-schnell": "FLUX Schnell",
     "flux-dev":     "FLUX Dev",
@@ -31,17 +14,62 @@
     "sdxl":         "Stable Diffusion XL",
   };
 
+  // ── DOM REFS ──────────────────────────────────────────────
+  const sidebar        = document.getElementById("sidebar");
+  const toggleSidebar  = document.getElementById("toggle-sidebar");
+  const newChatBtn     = document.getElementById("new-chat-btn");
+  const chatMessages   = document.getElementById("chat-messages");
+  const chatScroll     = document.getElementById("chat-scroll");
+  const welcomeScreen  = document.getElementById("welcome-screen");
+  const creditsEl      = document.getElementById("credits-remaining");
+  const creditsBadge   = document.getElementById("credits-badge");
+  const sidebarHistory = document.getElementById("sidebar-history");
+  const sidebarMeta    = document.querySelector(".sidebar-meta strong");
+
+  // Welcome (centered) input
+  const promptInput      = document.getElementById("prompt-input");
+  const sendBtn          = document.getElementById("send-btn");
+  const charCount        = document.getElementById("char-count");
+  const modelPickerBtn   = document.getElementById("model-picker-btn");
+  const modelPickerLabel = document.getElementById("model-picker-label");
+
+  // Bottom (chat active) input
+  const inputBarBottom        = document.getElementById("input-bar-bottom");
+  const promptInputBottom     = document.getElementById("prompt-input-bottom");
+  const sendBtnBottom         = document.getElementById("send-btn-bottom");
+  const charCountBottom       = document.getElementById("char-count-bottom");
+  const modelPickerBtnBottom  = document.getElementById("model-picker-btn-bottom");
+  const modelPickerLabelBtm   = document.getElementById("model-picker-label-bottom");
+
+  // Modal
+  const modalOverlay   = document.getElementById("model-modal-overlay");
+  const modalClose     = document.getElementById("model-modal-close");
+  const modelCards     = document.querySelectorAll(".model-card");
+
   // Preset buttons (sidebar + welcome chips)
   const presets = document.querySelectorAll("[data-prompt]");
 
   // ── STATE ─────────────────────────────────────────────────
   let isGenerating = false;
+  let selectedModel = "flux-schnell";
+  let isChatActive = false;   // tracks whether we're in chat mode
 
   // ── INIT ──────────────────────────────────────────────────
   fetchCredits();
-  autoResizeInput();
+  autoResizeInput(promptInput);
   loadHistory();
-  updateModelLabel();
+  syncModelUI();
+
+  // ── HELPERS: get active input/button refs ─────────────────
+  function getActivePromptInput() {
+    return isChatActive ? promptInputBottom : promptInput;
+  }
+  function getActiveSendBtn() {
+    return isChatActive ? sendBtnBottom : sendBtn;
+  }
+  function getActiveCharCount() {
+    return isChatActive ? charCountBottom : charCount;
+  }
 
   // ── SIDEBAR TOGGLE (MOBILE) ───────────────────────────────
   toggleSidebar?.addEventListener("click", () => {
@@ -54,16 +82,6 @@
     }
   });
 
-  // ── MODEL SELECTOR ─────────────────────────────────────────
-  modelSelect?.addEventListener("change", updateModelLabel);
-
-  function updateModelLabel() {
-    const key = modelSelect?.value || "flux-schnell";
-    const name = MODEL_LABELS[key] || key;
-    if (modelLabel) modelLabel.textContent = `${name} · Free tier`;
-    if (sidebarMeta) sidebarMeta.textContent = name;
-  }
-
   // ── NEW CHAT ──────────────────────────────────────────────
   newChatBtn?.addEventListener("click", resetChat);
 
@@ -71,13 +89,38 @@
     chatMessages.innerHTML = "";
     chatMessages.appendChild(welcomeScreen);
     welcomeScreen.classList.remove("hidden");
+
+    // Switch back to centered input
+    isChatActive = false;
+    inputBarBottom.classList.add("hidden");
+
     promptInput.value = "";
     promptInput.style.height = "auto";
-    updateCharCount();
-    updateSendBtn();
+    promptInputBottom.value = "";
+    promptInputBottom.style.height = "auto";
+
+    updateCharCount(charCount, promptInput);
+    updateCharCount(charCountBottom, promptInputBottom);
+    updateSendBtn(sendBtn, promptInput);
+    updateSendBtn(sendBtnBottom, promptInputBottom);
+
     fetchCredits();
     promptInput.focus();
     sidebar.classList.remove("open");
+  }
+
+  // ── SWITCH TO CHAT MODE ───────────────────────────────────
+  function activateChatMode() {
+    if (isChatActive) return;
+    isChatActive = true;
+    inputBarBottom.classList.remove("hidden");
+    // Transfer any text from welcome input to bottom input
+    promptInputBottom.value = promptInput.value;
+    promptInput.value = "";
+    autoResizeInput(promptInputBottom);
+    updateCharCount(charCountBottom, promptInputBottom);
+    updateSendBtn(sendBtnBottom, promptInputBottom);
+    promptInputBottom.focus();
   }
 
   // ── PRESET PROMPTS ────────────────────────────────────────
@@ -85,48 +128,106 @@
     btn.addEventListener("click", () => {
       const prompt = btn.dataset.prompt;
       if (prompt && !isGenerating) {
-        promptInput.value = prompt;
-        autoResizeInput();
-        updateCharCount();
-        updateSendBtn();
+        const input = getActivePromptInput();
+        input.value = prompt;
+        autoResizeInput(input);
+        updateCharCount(getActiveCharCount(), input);
+        updateSendBtn(getActiveSendBtn(), input);
         handleGenerate();
         sidebar.classList.remove("open");
       }
     });
   });
 
-  // ── INPUT HANDLING ────────────────────────────────────────
-  promptInput.addEventListener("input", () => {
-    autoResizeInput();
-    updateCharCount();
-    updateSendBtn();
+  // ── INPUT HANDLING (both inputs) ──────────────────────────
+  function wireInput(input, charEl, btnEl) {
+    input.addEventListener("input", () => {
+      autoResizeInput(input);
+      updateCharCount(charEl, input);
+      updateSendBtn(btnEl, input);
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (!btnEl.disabled) handleGenerate();
+      }
+    });
+
+    btnEl.addEventListener("click", () => {
+      if (!btnEl.disabled) handleGenerate();
+    });
+  }
+
+  wireInput(promptInput, charCount, sendBtn);
+  wireInput(promptInputBottom, charCountBottom, sendBtnBottom);
+
+  function autoResizeInput(input) {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 150) + "px";
+  }
+
+  function updateCharCount(el, input) {
+    const len = input.value.length;
+    el.textContent = `${len} / 500`;
+    el.classList.toggle("near-limit", len >= 400 && len < 500);
+    el.classList.toggle("at-limit", len >= 500);
+  }
+
+  function updateSendBtn(btn, input) {
+    btn.disabled = isGenerating || input.value.trim().length === 0;
+  }
+
+  // ── MODEL PICKER MODAL ───────────────────────────────────
+  function openModelModal() {
+    modalOverlay.classList.remove("hidden");
+  }
+
+  function closeModelModal() {
+    modalOverlay.classList.add("hidden");
+  }
+
+  modelPickerBtn?.addEventListener("click", openModelModal);
+  modelPickerBtnBottom?.addEventListener("click", openModelModal);
+  modalClose?.addEventListener("click", closeModelModal);
+
+  // Close on overlay click (outside modal)
+  modalOverlay?.addEventListener("click", (e) => {
+    if (e.target === modalOverlay) closeModelModal();
   });
 
-  promptInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      if (!sendBtn.disabled) handleGenerate();
+  // Close on Escape
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !modalOverlay.classList.contains("hidden")) {
+      closeModelModal();
     }
   });
 
-  sendBtn.addEventListener("click", () => {
-    if (!sendBtn.disabled) handleGenerate();
+  // Model card selection
+  modelCards.forEach(card => {
+    card.addEventListener("click", () => {
+      const modelKey = card.dataset.model;
+      if (!modelKey) return;
+
+      selectedModel = modelKey;
+
+      // Update active state on cards
+      modelCards.forEach(c => c.classList.remove("active"));
+      card.classList.add("active");
+
+      syncModelUI();
+      closeModelModal();
+
+      // Focus the active prompt input
+      getActivePromptInput().focus();
+    });
   });
 
-  function autoResizeInput() {
-    promptInput.style.height = "auto";
-    promptInput.style.height = Math.min(promptInput.scrollHeight, 150) + "px";
-  }
-
-  function updateCharCount() {
-    const len = promptInput.value.length;
-    charCount.textContent = `${len} / 500`;
-    charCount.classList.toggle("near-limit", len >= 400 && len < 500);
-    charCount.classList.toggle("at-limit", len >= 500);
-  }
-
-  function updateSendBtn() {
-    sendBtn.disabled = isGenerating || promptInput.value.trim().length === 0;
+  function syncModelUI() {
+    const name = MODEL_LABELS[selectedModel] || selectedModel;
+    if (modelPickerLabel) modelPickerLabel.textContent = name;
+    if (modelPickerLabelBtm) modelPickerLabelBtm.textContent = name;
+    if (sidebarMeta) sidebarMeta.textContent = name;
   }
 
   // ── CREDITS ───────────────────────────────────────────────
@@ -228,10 +329,26 @@
     body.appendChild(label);
 
     if (opts.loading) {
+      const loadWrap = document.createElement("div");
+      loadWrap.style.display = "flex";
+      loadWrap.style.alignItems = "center";
+      loadWrap.style.gap = "10px";
+
       const dots = document.createElement("div");
       dots.classList.add("loading-dots");
       dots.innerHTML = "<span></span><span></span><span></span>";
-      body.appendChild(dots);
+      loadWrap.appendChild(dots);
+
+      if (content) {
+        const statusText = document.createElement("span");
+        statusText.classList.add("msg-text");
+        statusText.style.fontSize = "0.82rem";
+        statusText.style.color = "var(--text-muted)";
+        statusText.textContent = content;
+        loadWrap.appendChild(statusText);
+      }
+
+      body.appendChild(loadWrap);
     } else if (opts.error) {
       const err = document.createElement("div");
       err.classList.add("msg-error");
@@ -311,22 +428,31 @@
 
   // ── CORE GENERATION LOGIC ─────────────────────────────────
   async function handleGenerate() {
-    const prompt = promptInput.value.trim();
+    const input = getActivePromptInput();
+    const prompt = input.value.trim();
     if (!prompt || isGenerating) return;
 
     isGenerating = true;
-    updateSendBtn();
+
+    // Switch to chat mode (shows bottom input, hides welcome)
+    activateChatMode();
+
+    // Disable both send buttons
+    sendBtn.disabled = true;
+    sendBtnBottom.disabled = true;
 
     // Add user message
     addMessage("user", prompt);
 
-    // Clear input
+    // Clear both inputs
     promptInput.value = "";
     promptInput.style.height = "auto";
-    updateCharCount();
+    promptInputBottom.value = "";
+    promptInputBottom.style.height = "auto";
+    updateCharCount(charCount, promptInput);
+    updateCharCount(charCountBottom, promptInputBottom);
 
-    // Determine selected model
-    const selectedModel = modelSelect?.value || "flux-schnell";
+    // Determine model
     const modelName = MODEL_LABELS[selectedModel] || selectedModel;
 
     // Add loading AI message with model name
@@ -384,8 +510,9 @@
       }
     } finally {
       isGenerating = false;
-      updateSendBtn();
-      promptInput.focus();
+      updateSendBtn(sendBtn, promptInput);
+      updateSendBtn(sendBtnBottom, promptInputBottom);
+      getActivePromptInput().focus();
     }
   }
 
@@ -411,6 +538,9 @@
       chatMessages.innerHTML = "";
       chatMessages.appendChild(welcomeScreen);
       welcomeScreen.classList.add("hidden");
+
+      // Switch to chat mode
+      activateChatMode();
 
       addMessage("user", prompt);
       if (imageSrc) {
