@@ -992,3 +992,46 @@ body {
     display: none;
   }
 }
+
+/* ============================================================
+   AUTOCORRECT TOAST
+   ============================================================ */
+#autocorrect-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: rgba(30, 30, 30, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+              0 0 0 1px rgba(255, 255, 255, 0.04);
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(12px) scale(0.96);
+  transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
+}
+
+#autocorrect-toast.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+#autocorrect-toast svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+#autocorrect-toast strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}

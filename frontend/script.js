@@ -6,6 +6,225 @@
   const HISTORY_KEY = "neuralcanvas_history";
   const MAX_HISTORY = 50;
 
+  // ── AUTOCORRECT DICTIONARY ────────────────────────────────
+  // Common misspellings → correct spellings (focused on general
+  // English + image-generation / art terms)
+  const AUTOCORRECT_MAP = {
+    // ── General common misspellings ──
+    "teh": "the", "thier": "their", "thsi": "this", "taht": "that",
+    "adn": "and", "wiht": "with", "hte": "the", "nto": "not",
+    "waht": "what", "whta": "what", "becuase": "because", "beacuse": "because",
+    "becasue": "because", "definately": "definitely", "definatly": "definitely",
+    "definitly": "definitely", "defintely": "definitely",
+    "seperate": "separate", "occured": "occurred", "occuring": "occurring",
+    "recieve": "receive", "acheive": "achieve", "beleive": "believe",
+    "wierd": "weird", "freind": "friend", "untill": "until",
+    "accross": "across", "adress": "address", "agressive": "aggressive",
+    "apparantly": "apparently", "basicly": "basically", "begining": "beginning",
+    "belive": "believe", "buisness": "business", "calender": "calendar",
+    "carefull": "careful", "carribean": "caribbean", "cemetary": "cemetery",
+    "changeable": "changeable", "collegue": "colleague", "comming": "coming",
+    "commitee": "committee", "completly": "completely", "concious": "conscious",
+    "curiousity": "curiosity", "decieve": "deceive", "desparate": "desperate",
+    "develope": "develop", "dissapear": "disappear", "dissapoint": "disappoint",
+    "embarass": "embarrass", "enviroment": "environment", "exagerate": "exaggerate",
+    "exersice": "exercise", "experiance": "experience", "facinated": "fascinated",
+    "familar": "familiar", "finaly": "finally", "flourescent": "fluorescent",
+    "foriegn": "foreign", "fourty": "forty", "freindly": "friendly",
+    "goverment": "government", "grammer": "grammar", "gaurd": "guard",
+    "happend": "happened", "harrass": "harass", "heighth": "height",
+    "immediatly": "immediately", "independant": "independent",
+    "interupt": "interrupt", "jewlery": "jewelry", "judgement": "judgment",
+    "knowlege": "knowledge", "liason": "liaison", "libary": "library",
+    "liscense": "license", "maintenence": "maintenance", "millenium": "millennium",
+    "mispell": "misspell", "necesary": "necessary", "neccessary": "necessary",
+    "noticable": "noticeable", "occassion": "occasion", "occurence": "occurrence",
+    "orignal": "original", "parliment": "parliament", "pasttime": "pastime",
+    "perseverence": "perseverance", "personell": "personnel",
+    "posession": "possession", "potatos": "potatoes", "precede": "precede",
+    "privelege": "privilege", "profesional": "professional",
+    "publically": "publicly", "realy": "really", "refered": "referred",
+    "relevent": "relevant", "religous": "religious", "repitition": "repetition",
+    "resistence": "resistance", "shedule": "schedule", "sieze": "seize",
+    "succesful": "successful", "supercede": "supersede", "suprise": "surprise",
+    "tommorow": "tomorrow", "tommorrow": "tomorrow", "tomorow": "tomorrow",
+    "tounge": "tongue", "truely": "truly", "unforseen": "unforeseen",
+    "unfortunatly": "unfortunately", "useing": "using", "usally": "usually",
+    "vaccuum": "vacuum", "vegetable": "vegetable", "wether": "whether",
+    "wich": "which", "writting": "writing",
+
+    // ── Art / Image generation terms ──
+    "landsacpe": "landscape", "landscpae": "landscape", "landcsape": "landscape",
+    "landscaep": "landscape", "portriat": "portrait", "portait": "portrait",
+    "portrat": "portrait", "potrait": "portrait", "portriate": "portrait",
+    "abstact": "abstract", "abstarct": "abstract",
+    "realsitic": "realistic", "realisitc": "realistic", "realitsic": "realistic",
+    "reaslistic": "realistic", "relistic": "realistic",
+    "cinematc": "cinematic", "cinemtaic": "cinematic", "cinmatiec": "cinematic",
+    "cinamatic": "cinematic", "cinemeatic": "cinematic",
+    "fantsy": "fantasy", "fatnasy": "fantasy", "fantacy": "fantasy",
+    "surreal": "surreal", "surreal": "surreal", "surrealsim": "surrealism",
+    "photorealisitc": "photorealistic", "photorealstic": "photorealistic",
+    "photorealsitic": "photorealistic", "photorealitsic": "photorealistic",
+    "illustartion": "illustration", "illustraiton": "illustration",
+    "illlustration": "illustration", "illustation": "illustration",
+    "watercollor": "watercolor", "watercolour": "watercolor",
+    "watercoulor": "watercolor", "watercolro": "watercolor",
+    "backgorund": "background", "backgroud": "background",
+    "backround": "background", "backgruond": "background",
+    "forground": "foreground", "foregroud": "foreground",
+    "foregournd": "foreground",
+    "lighitng": "lighting", "lighing": "lighting", "ligthing": "lighting",
+    "lightnig": "lighting", "litghting": "lighting",
+    "texutre": "texture", "textrue": "texture", "texure": "texture",
+    "shadwos": "shadows", "shadwows": "shadows", "shaodws": "shadows",
+    "reflecton": "reflection", "reflcetion": "reflection",
+    "atmospher": "atmosphere", "atmospheer": "atmosphere",
+    "atmopshere": "atmosphere",
+    "compsition": "composition", "compostion": "composition",
+    "compositon": "composition",
+    "virbant": "vibrant", "vibarnt": "vibrant", "vibrantt": "vibrant",
+    "coloful": "colorful", "colourful": "colorful", "colorfull": "colorful",
+    "colorul": "colorful",
+    "detaield": "detailed", "deatiled": "detailed", "detaild": "detailed",
+    "beautfiul": "beautiful", "beauitful": "beautiful", "beutiful": "beautiful",
+    "beatiful": "beautiful", "beautifull": "beautiful", "beautuful": "beautiful",
+    "mysteirous": "mysterious", "mystrious": "mysterious",
+    "mysteriosu": "mysterious",
+    "majesitc": "majestic", "majestci": "majestic", "majsetic": "majestic",
+    "etherel": "ethereal", "etherial": "ethereal", "etheral": "ethereal",
+    "dramtic": "dramatic", "dramatci": "dramatic", "drmatic": "dramatic",
+    "minmalist": "minimalist", "minimalsit": "minimalist",
+    "minimalst": "minimalist",
+    "futuristc": "futuristic", "futurisitc": "futuristic",
+    "futurstic": "futuristic",
+    "cyberpnuk": "cyberpunk", "cybrpunk": "cyberpunk", "cybrepunk": "cyberpunk",
+    "steampnuk": "steampunk", "steampukn": "steampunk",
+    "astronuat": "astronaut", "astornaut": "astronaut", "astronaunt": "astronaut",
+    "galaxxy": "galaxy", "galazy": "galaxy", "galxay": "galaxy",
+    "nebual": "nebula", "neblua": "nebula", "nebulae": "nebula",
+    "mountian": "mountain", "moutain": "mountain", "montain": "mountain",
+    "mountans": "mountains", "moutains": "mountains",
+    "oceaan": "ocean", "ocaen": "ocean",
+    "sunet": "sunset", "sunest": "sunset", "sunste": "sunset",
+    "sunrsie": "sunrise", "sunirse": "sunrise",
+    "gloiwng": "glowing", "glowign": "glowing", "golwing": "glowing",
+    "floaitng": "floating", "floting": "floating", "flaoting": "floating",
+    "enchaned": "enchanted", "enchantd": "enchanted", "encahnted": "enchanted",
+    "mediveal": "medieval", "medeival": "medieval", "medievl": "medieval",
+    "renassiance": "renaissance", "rennaissance": "renaissance",
+    "renaissanec": "renaissance",
+    "hyperrealisitc": "hyperrealistic", "hyper-realstic": "hyper-realistic",
+    "anceint": "ancient", "acnient": "ancient", "anicent": "ancient",
+    "architecutre": "architecture", "architectrue": "architecture",
+    "scultpure": "sculpture", "sculputre": "sculpture",
+    "noen": "neon", "noen": "neon",
+    "charecter": "character", "charcter": "character", "charachter": "character",
+    "craeture": "creature", "cretaure": "creature", "crature": "creature",
+    "dimesnion": "dimension", "dimenison": "dimension",
+    "intriacte": "intricate", "intircate": "intricate", "intracate": "intricate",
+    "ornametal": "ornamental", "ornamentel": "ornamental",
+    "symmetircal": "symmetrical", "symettrical": "symmetrical",
+    "asthetic": "aesthetic", "aestehtic": "aesthetic", "aestheic": "aesthetic",
+    "styilzed": "stylized", "stylzied": "stylized", "stlyized": "stylized",
+    "rendred": "rendered", "renderd": "rendered", "rendreed": "rendered",
+    "luminuos": "luminous", "luminos": "luminous", "luminious": "luminous",
+    "iridescnet": "iridescent", "iridecent": "iridescent",
+    "trasparent": "transparent", "transparnet": "transparent",
+    "transluecnt": "translucent", "translucnet": "translucent",
+    "holographc": "holographic", "holgraphic": "holographic",
+    "psychedlic": "psychedelic", "psychedleic": "psychedelic",
+    "whismical": "whimsical", "whimsicle": "whimsical",
+    "apocalypitc": "apocalyptic", "apocolyptic": "apocalyptic",
+    "dystopain": "dystopian", "dystpoian": "dystopian",
+    "utopinan": "utopian", "utpoian": "utopian",
+  };
+
+  // ── AUTOCORRECT ENGINE ────────────────────────────────────
+
+  /** Show a small toast notification for autocorrected words */
+  function showAutocorrectToast(original, corrected) {
+    // Remove any existing toast
+    const existing = document.getElementById("autocorrect-toast");
+    if (existing) existing.remove();
+
+    const toast = document.createElement("div");
+    toast.id = "autocorrect-toast";
+    toast.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/>
+      </svg>
+      <span>Corrected "<strong>${original}</strong>" → "<strong>${corrected}</strong>"</span>
+    `;
+    document.body.appendChild(toast);
+
+    // Trigger entrance animation
+    requestAnimationFrame(() => {
+      toast.classList.add("show");
+    });
+
+    // Auto-dismiss after 2.5 seconds
+    setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 300);
+    }, 2500);
+  }
+
+  /**
+   * Autocorrect the last typed word in a textarea.
+   * Called on space/Enter keypress. Returns true if a correction was made.
+   */
+  function autocorrectLastWord(textarea) {
+    const cursorPos = textarea.selectionStart;
+    const text = textarea.value;
+
+    // Find the start of the last word (search backwards from cursor - 1)
+    let wordEnd = cursorPos;
+    let wordStart = cursorPos;
+
+    // Move back past trailing spaces/newlines
+    while (wordEnd > 0 && /[\s]/.test(text[wordEnd - 1])) {
+      wordEnd--;
+    }
+
+    // Find word start
+    wordStart = wordEnd;
+    while (wordStart > 0 && /[^\s]/.test(text[wordStart - 1])) {
+      wordStart--;
+    }
+
+    if (wordStart === wordEnd) return false;
+
+    const word = text.substring(wordStart, wordEnd);
+    const lower = word.toLowerCase();
+
+    // Look up in dictionary
+    const corrected = AUTOCORRECT_MAP[lower];
+    if (!corrected || corrected === lower) return false;
+
+    // Preserve original casing pattern
+    let replacement;
+    if (word === word.toUpperCase()) {
+      // ALL CAPS → ALL CAPS
+      replacement = corrected.toUpperCase();
+    } else if (word[0] === word[0].toUpperCase()) {
+      // Title Case → Title Case
+      replacement = corrected.charAt(0).toUpperCase() + corrected.slice(1);
+    } else {
+      replacement = corrected;
+    }
+
+    // Replace in text
+    const newText = text.substring(0, wordStart) + replacement + text.substring(wordEnd);
+    const newCursorPos = cursorPos + (replacement.length - word.length);
+
+    textarea.value = newText;
+    textarea.selectionStart = textarea.selectionEnd = newCursorPos;
+
+    showAutocorrectToast(word, replacement);
+    return true;
+  }
+
   // ── MODEL DATA ────────────────────────────────────────────
   const MODEL_LABELS = {
     "flux-schnell": "FLUX Schnell",
@@ -148,13 +367,26 @@
     });
 
     input.addEventListener("keydown", (e) => {
+      // Run autocorrect on space
+      if (e.key === " ") {
+        // Use setTimeout so the space character is inserted first
+        setTimeout(() => {
+          autocorrectLastWord(input);
+          updateCharCount(charEl, input);
+        }, 0);
+      }
+
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
+        // Autocorrect the last word before sending
+        autocorrectLastWord(input);
         if (!btnEl.disabled) handleGenerate();
       }
     });
 
     btnEl.addEventListener("click", () => {
+      // Autocorrect one final time before generating
+      autocorrectLastWord(input);
       if (!btnEl.disabled) handleGenerate();
     });
   }
