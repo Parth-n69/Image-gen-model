@@ -88,6 +88,24 @@ def generate_image():
 
     hf_model_id = MODELS[model_key]
 
+    # ── Extract Phase 1 parameters ─────────────────────────────
+    negative_prompt = data.get("negative_prompt", "").strip()
+    
+    try:
+        width = int(data.get("width", 1024))
+    except (ValueError, TypeError):
+        width = 1024
+        
+    try:
+        height = int(data.get("height", 1024))
+    except (ValueError, TypeError):
+        height = 1024
+
+    if not (512 <= width <= 1536):
+        return jsonify({"error": "width must be between 512 and 1536"}), 400
+    if not (512 <= height <= 1536):
+        return jsonify({"error": "height must be between 512 and 1536"}), 400
+
     # ── Validate API key is configured ─────────────────────────
     if not HF_API_KEY:
         return jsonify({"error": "Server misconfiguration: Hugging Face API key is not set."}), 500
@@ -96,7 +114,16 @@ def generate_image():
     client = InferenceClient(token=HF_API_KEY)
 
     try:
-        image = client.text_to_image(prompt, model=hf_model_id)
+        kwargs = {"width": width, "height": height}
+        if negative_prompt:
+            kwargs["negative_prompt"] = negative_prompt
+            
+        try:
+            image = client.text_to_image(prompt, model=hf_model_id, **kwargs)
+        except Exception:
+            # Fallback if model doesn't support width/height/negative_prompt
+            image = client.text_to_image(prompt, model=hf_model_id)
+            
     except Exception as exc:
         error_msg = str(exc)
 

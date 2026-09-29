@@ -729,6 +729,130 @@ body {
 }
 
 /* ============================================================
+   GENERATION OPTIONS
+   ============================================================ */
+.options-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px 6px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.76rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--t-fast);
+  white-space: nowrap;
+}
+
+.options-toggle-btn:hover,
+.options-toggle-btn.active {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(168, 85, 247, 0.35);
+  color: var(--text-primary);
+}
+
+.options-toggle-btn.active {
+  background: rgba(168, 85, 247, 0.15);
+  color: #fff;
+}
+
+.generation-options {
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.generation-options.hidden {
+  display: none;
+}
+
+.options-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.options-group.w-full {
+  width: 100%;
+}
+
+.options-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: rgba(255,255,255,0.02);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+
+.preset-btn:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+}
+
+.preset-btn.active {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.negative-prompt-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color var(--t-fast);
+}
+
+.negative-prompt-input:focus {
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.negative-prompt-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ============================================================
    MODEL PICKER MODAL
    ============================================================ */
 .model-modal-overlay {

@@ -73,6 +73,39 @@
 
           <!-- Centered input (shown on welcome screen) -->
           <div class="welcome-input-area" id="welcome-input-area">
+            <!-- Generation Options Panel (Moved to bottom input bar when chat is active) -->
+            <div class="generation-options hidden" id="generation-options">
+              <div class="options-row">
+                <div class="options-group">
+                  <label>Style Preset</label>
+                  <div class="preset-buttons" id="style-presets">
+                    <button class="preset-btn active" data-style="none">None</button>
+                    <button class="preset-btn" data-style="Realistic Photo">Realistic Photo</button>
+                    <button class="preset-btn" data-style="Anime">Anime</button>
+                    <button class="preset-btn" data-style="3D Render">3D Render</button>
+                    <button class="preset-btn" data-style="Digital Art">Digital Art</button>
+                    <button class="preset-btn" data-style="Oil Painting">Oil Painting</button>
+                  </div>
+                </div>
+              </div>
+              <div class="options-row">
+                <div class="options-group">
+                  <label>Aspect Ratio</label>
+                  <div class="preset-buttons" id="aspect-ratios">
+                    <button class="preset-btn active" data-ratio="1024x1024">Square</button>
+                    <button class="preset-btn" data-ratio="1024x1536">Portrait</button>
+                    <button class="preset-btn" data-ratio="1536x1024">Landscape</button>
+                  </div>
+                </div>
+              </div>
+              <div class="options-row">
+                <div class="options-group w-full">
+                  <label>Negative prompt (optional) — things to avoid</label>
+                  <input type="text" class="negative-prompt-input" id="negative-prompt" placeholder="blurry, low quality, distorted, extra limbs, watermark" />
+                </div>
+              </div>
+            </div>
+
             <div class="input-bar-inner">
               <textarea id="prompt-input" rows="1" placeholder="Describe the image you want to create…" maxlength="500"></textarea>
               <button id="send-btn" class="send-btn" title="Generate image" disabled>
@@ -82,6 +115,10 @@
             <div class="input-toolbar">
               <span class="char-count" id="char-count">0 / 500</span>
               <div class="toolbar-right">
+                <button class="options-toggle-btn" type="button" title="Toggle Options">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+                  <span>Options</span>
+                </button>
                 <button class="model-picker-btn" id="model-picker-btn" type="button">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                   <span id="model-picker-label">FLUX Schnell</span>
@@ -112,6 +149,10 @@
       <div class="input-toolbar">
         <span class="char-count" id="char-count-bottom">0 / 500</span>
         <div class="toolbar-right">
+          <button class="options-toggle-btn" type="button" title="Toggle Options">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+            <span>Options</span>
+          </button>
           <button class="model-picker-btn" id="model-picker-btn-bottom" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             <span id="model-picker-label-bottom">FLUX Schnell</span>

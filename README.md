@@ -94,9 +94,13 @@ Simply open `frontend/index.html` in your browser:
 ## 🎨 Usage
 
 1. Type a descriptive prompt (e.g., *"A cyberpunk city at sunset, neon lights, ultra detailed"*)
-2. Click **Generate** (or press Enter)
-3. Wait 10-30 seconds (longer on cold starts when the model is loading)
-4. View and **download** your generated image as a PNG
+2. (Optional) Open the **Options** panel to select:
+   - **Style Preset:** Quickly apply a specific artistic style (e.g., Anime, Realistic Photo).
+   - **Aspect Ratio:** Choose between Square, Portrait, or Landscape.
+   - **Negative Prompt:** Specify things to avoid in the generation (e.g., "blurry, distorted").
+3. Click **Generate** (or press Enter)
+4. Wait 10-30 seconds (longer on cold starts when the model is loading)
+5. View and **download** your generated image as a PNG
 
 ---
 

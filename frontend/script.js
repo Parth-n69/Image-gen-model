@@ -301,6 +301,46 @@
     }
   });
 
+  // ── OPTIONS PANEL ─────────────────────────────────────────
+  const optionsToggleBtns = document.querySelectorAll(".options-toggle-btn");
+  const optionsPanel = document.getElementById("generation-options");
+  const stylePresetsBtns = document.querySelectorAll("#style-presets .preset-btn");
+  const aspectRatioBtns = document.querySelectorAll("#aspect-ratios .preset-btn");
+  const negativePromptInput = document.getElementById("negative-prompt");
+
+  let isOptionsOpen = false;
+  let activeStyle = "none";
+  let activeRatio = "1024x1024";
+
+  optionsToggleBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      isOptionsOpen = !isOptionsOpen;
+      if (isOptionsOpen) {
+        optionsPanel.classList.remove("hidden");
+        optionsToggleBtns.forEach(b => b.classList.add("active"));
+      } else {
+        optionsPanel.classList.add("hidden");
+        optionsToggleBtns.forEach(b => b.classList.remove("active"));
+      }
+    });
+  });
+
+  stylePresetsBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      stylePresetsBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeStyle = btn.dataset.style;
+    });
+  });
+
+  aspectRatioBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      aspectRatioBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeRatio = btn.dataset.ratio;
+    });
+  });
+
   // ── NEW CHAT ──────────────────────────────────────────────
   newChatBtn?.addEventListener("click", resetChat);
 
@@ -312,6 +352,12 @@
     // Switch back to centered input
     isChatActive = false;
     inputBarBottom.classList.add("hidden");
+    
+    // Move options panel back to welcome screen
+    if (optionsPanel) {
+      const welcomeInputArea = document.getElementById("welcome-input-area");
+      welcomeInputArea.insertBefore(optionsPanel, welcomeInputArea.querySelector('.input-bar-inner'));
+    }
 
     promptInput.value = "";
     promptInput.style.height = "auto";
@@ -333,6 +379,12 @@
     if (isChatActive) return;
     isChatActive = true;
     inputBarBottom.classList.remove("hidden");
+    
+    // Move options panel to bottom input bar
+    if (optionsPanel) {
+      inputBarBottom.insertBefore(optionsPanel, inputBarBottom.firstChild);
+    }
+    
     // Transfer any text from welcome input to bottom input
     promptInputBottom.value = promptInput.value;
     promptInput.value = "";
@@ -687,14 +739,41 @@
     // Determine model
     const modelName = MODEL_LABELS[selectedModel] || selectedModel;
 
-    // Add loading AI message with model name
-    const aiMsg = addMessage("ai", `Generating with ${modelName}…`, { loading: true });
+    // ── Apply Phase 1 Options ──
+    let finalPrompt = prompt;
+    
+    // Apply style modifier
+    if (activeStyle !== "none") {
+      const styleModifiers = {
+        "Realistic Photo": ", photorealistic, professional photography, sharp focus, natural lighting, 8k",
+        "Anime": ", anime style, vibrant colors, cel shading, Studio Ghibli inspired",
+        "3D Render": ", 3D render, octane render, unreal engine, highly detailed, cinematic lighting",
+        "Digital Art": ", digital art, concept art, trending on artstation, highly detailed",
+        "Oil Painting": ", oil painting, textured brushstrokes, classical art style, museum quality"
+      };
+      if (styleModifiers[activeStyle]) {
+        finalPrompt += styleModifiers[activeStyle];
+      }
+    }
+
+    const [width, height] = activeRatio.split("x").map(Number);
+    const negativePrompt = negativePromptInput.value.trim();
+
+    // Add loading AI message with model name and style
+    const styleText = activeStyle !== "none" ? ` (${activeStyle} style)` : "";
+    const aiMsg = addMessage("ai", `Generating with ${modelName}${styleText}…`, { loading: true });
 
     try {
       const res = await fetch(`${API_URL}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, model: selectedModel }),
+        body: JSON.stringify({ 
+          prompt: finalPrompt, 
+          model: selectedModel,
+          negative_prompt: negativePrompt,
+          width: width,
+          height: height
+        }),
       });
 
       let data;
