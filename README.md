@@ -40,7 +40,7 @@ image-gen-model/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Parth-n69/Image-gen-model.git
+git clone https://github.com/your-username/Image-gen-model.git
 cd Image-gen-model
 ```
 
