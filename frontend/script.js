@@ -6,6 +6,31 @@
   const HISTORY_KEY = "neuralcanvas_history";
   const MAX_HISTORY = 50;
 
+  // ── THEME LOGIC ───────────────────────────────────────────
+  const themeToggleBtn = document.getElementById("theme-toggle-btn");
+  
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+    if (themeToggleBtn) {
+      if (theme === "light") {
+        themeToggleBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>';
+      } else {
+        themeToggleBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+      }
+    }
+  }
+
+  const savedTheme = localStorage.getItem("theme") || "dark";
+  applyTheme(savedTheme);
+
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener("click", () => {
+      const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
+      applyTheme(currentTheme === "light" ? "dark" : "light");
+    });
+  }
+
   // ── AUTOCORRECT DICTIONARY ────────────────────────────────
   // Common misspellings → correct spellings (focused on general
   // English + image-generation / art terms)
@@ -277,10 +302,27 @@
   // Tab system
   const tabBtns = document.querySelectorAll(".tab-btn");
   const tabGenerate = document.getElementById("tab-generate");
+  const tabEdit = document.getElementById("tab-edit");
   const tabGallery = document.getElementById("tab-gallery");
   const tabContentGenerate = document.getElementById("tab-content-generate");
+  const tabContentEdit = document.getElementById("tab-content-edit");
   const tabContentGallery = document.getElementById("tab-content-gallery");
   const galleryCountEl = document.getElementById("gallery-count");
+  
+  // Global Toast
+  const globalToast = document.getElementById("global-toast");
+  const globalToastMessage = document.getElementById("global-toast-message");
+  let toastTimeout;
+  
+  window.showToast = function(message) {
+    if (!globalToast) return;
+    globalToastMessage.textContent = message;
+    globalToast.classList.add("show");
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => {
+      globalToast.classList.remove("show");
+    }, 3000);
+  };
 
   // Gallery
   const galleryGrid = document.getElementById("gallery-grid");
@@ -402,14 +444,23 @@
 
     // Update tab button states
     tabBtns.forEach(b => b.classList.remove("active"));
+    
+    // Hide all contents
+    tabContentGenerate.classList.remove("active");
+    tabContentEdit.classList.remove("active");
+    tabContentGallery.classList.remove("active");
+
     if (tabName === "generate") {
       tabGenerate.classList.add("active");
       tabContentGenerate.classList.add("active");
-      tabContentGallery.classList.remove("active");
+    } else if (tabName === "edit") {
+      tabEdit.classList.add("active");
+      tabContentEdit.classList.add("active");
+      // Force canvas resize if needed
+      if (typeof window.resizeEditCanvas === 'function') window.resizeEditCanvas();
     } else {
       tabGallery.classList.add("active");
       tabContentGallery.classList.add("active");
-      tabContentGenerate.classList.remove("active");
       renderGallery();
     }
   }
@@ -737,6 +788,16 @@
     dlBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Download`;
     dlBtn.addEventListener("click", () => downloadImage(imageSrc, altText));
     actions.appendChild(dlBtn);
+    
+    const editBtn = document.createElement("button");
+    editBtn.classList.add("msg-action-btn");
+    editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg> Edit this image`;
+    editBtn.addEventListener("click", () => {
+       if (typeof window.loadIntoEditor === 'function') {
+           window.loadIntoEditor(imageSrc);
+       }
+    });
+    actions.appendChild(editBtn);
 
     body.appendChild(actions);
   }
@@ -1020,6 +1081,8 @@
 
     if (galleryFilter === "favorites") {
       filtered = records.filter(r => r.favorite);
+    } else if (galleryFilter === "edits") {
+      filtered = records.filter(r => r.type === "edit");
     }
 
     updateGalleryCount(records.length);
@@ -1033,6 +1096,10 @@
       if (galleryFilter === "favorites") {
         galleryEmpty.querySelector("h3").textContent = "No favorites yet";
         galleryEmpty.querySelector("p").textContent = "Star some images to find them here.";
+        galleryEmptyGenerateBtn.classList.add("hidden");
+      } else if (galleryFilter === "edits") {
+        galleryEmpty.querySelector("h3").textContent = "No edits yet";
+        galleryEmpty.querySelector("p").textContent = "Use the Edit tab to modify an image.";
         galleryEmptyGenerateBtn.classList.add("hidden");
       } else {
         galleryEmpty.querySelector("h3").textContent = "No images yet";
@@ -1066,9 +1133,13 @@
     card.innerHTML = `
       <div class="gallery-card-image">
         <img src="${record.image}" alt="${escapeHtml(record.prompt)}" loading="lazy" />
+        ${record.type === "edit" ? '<span class="model-card-badge quality" style="position:absolute; top:8px; left:8px; z-index:10; background:rgba(168,85,247,0.8); border:none; color:white;">Edited</span>' : ''}
         <div class="gallery-card-overlay">
           <button class="gallery-card-action fav-btn ${record.favorite ? "active" : ""}" data-action="fav" title="Favorite">
             <svg viewBox="0 0 24 24" fill="${record.favorite ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+          <button class="gallery-card-action" data-action="edit-img" title="Edit this image">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg>
           </button>
           <button class="gallery-card-action" data-action="download" title="Download">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -1098,6 +1169,13 @@
       if (newState !== null) {
         record.favorite = newState;
         renderGallery(); // re-render to update icons
+      }
+    });
+
+    card.querySelector('[data-action="edit-img"]').addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (typeof window.loadIntoEditor === 'function') {
+        window.loadIntoEditor(record.image, record.id);
       }
     });
 
@@ -1147,6 +1225,22 @@
     lightboxModel.textContent = MODEL_LABELS[record.model] || record.model || "Unknown";
     lightboxStyle.textContent = record.style && record.style !== "none" ? record.style : "None";
     lightboxSize.textContent = `${record.width} × ${record.height}`;
+    
+    const editPromptEl = document.getElementById("lightbox-edit-prompt-val");
+    if (record.type === "edit" && record.editPrompt) {
+      if (!editPromptEl) {
+        const div = document.createElement("div");
+        div.className = "lightbox-detail-section";
+        div.id = "lightbox-edit-prompt-sec";
+        div.innerHTML = `<div class="lightbox-detail-label">Edit Prompt</div><div class="lightbox-detail-value" id="lightbox-edit-prompt-val">${escapeHtml(record.editPrompt)}</div>`;
+        document.querySelector(".lightbox-details").insertBefore(div, document.getElementById("lightbox-neg-section"));
+      } else {
+        editPromptEl.textContent = record.editPrompt;
+        document.getElementById("lightbox-edit-prompt-sec").classList.remove("hidden");
+      }
+    } else if (editPromptEl) {
+      document.getElementById("lightbox-edit-prompt-sec").classList.add("hidden");
+    }
 
     // Update fav button state
     updateLightboxFavBtn(record.favorite);
@@ -1255,6 +1349,15 @@
     }
   });
 
+  // Edit from lightbox
+  const lightboxEditBtn = document.getElementById("lightbox-edit-btn");
+  lightboxEditBtn?.addEventListener("click", () => {
+    if (currentLightboxRecord && typeof window.loadIntoEditor === 'function') {
+      window.loadIntoEditor(currentLightboxRecord.image, currentLightboxRecord.id);
+      closeLightbox();
+    }
+  });
+
   // Delete from lightbox
   lightboxDeleteBtn?.addEventListener("click", async () => {
     if (!currentLightboxRecord) return;
@@ -1339,6 +1442,7 @@
 
       // Cleanup blob URL after a short delay
       setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      window.showToast("Image downloaded successfully!");
     } else {
       const link = document.createElement("a");
       link.href = dataUri;
@@ -1346,7 +1450,315 @@
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.showToast("Image downloaded successfully!");
     }
   }
+
+  // ── EDIT TAB LOGIC ────────────────────────────────────────
+
+  const editDropZone = document.getElementById("edit-drop-zone");
+  const editFileInput = document.getElementById("edit-file-input");
+  const editUploadBtn = document.getElementById("edit-upload-btn");
+  const editCanvas = document.getElementById("edit-canvas");
+  const editCtx = editCanvas.getContext("2d");
+  const editEmptyState = document.getElementById("edit-empty-state");
+  const editImageActions = document.getElementById("edit-image-actions");
+  
+  const editPromptInput = document.getElementById("edit-prompt-input");
+  const editModelSelect = document.getElementById("edit-model-select");
+  const editAiApplyBtn = document.getElementById("edit-ai-apply-btn");
+  const editLoadingMsg = document.getElementById("edit-loading-msg");
+  const editChips = document.querySelectorAll(".edit-chip");
+  
+  const editUndoBtn = document.getElementById("edit-undo-btn");
+  const editResetBtn = document.getElementById("edit-reset-btn");
+  const editCompareBtn = document.getElementById("edit-compare-btn");
+  const editCompareOverlay = document.getElementById("edit-compare-overlay");
+  const editCompareImg = document.getElementById("edit-compare-img");
+  
+  const toolRotLeft = document.getElementById("tool-rot-left");
+  const toolRotRight = document.getElementById("tool-rot-right");
+  const toolFlipH = document.getElementById("tool-flip-h");
+  const toolFlipV = document.getElementById("tool-flip-v");
+  
+  const sliderBrightness = document.getElementById("slider-brightness");
+  const sliderContrast = document.getElementById("slider-contrast");
+  const sliderSaturation = document.getElementById("slider-saturation");
+  const sliderBlur = document.getElementById("slider-blur");
+  
+  const filterGrayscale = document.getElementById("filter-grayscale");
+  const filterSepia = document.getElementById("filter-sepia");
+  const filterInvert = document.getElementById("filter-invert");
+  
+  const editSaveGalleryBtn = document.getElementById("edit-save-gallery-btn");
+  const editDownloadBtn = document.getElementById("edit-download-btn");
+  
+  let sourceImage = null;
+  let originalImageSrc = null;
+  let editHistory = [];
+  let currentParentId = null;
+  
+  let baseEdits = {
+    brightness: 100, contrast: 100, saturation: 100, blur: 0,
+    grayscale: false, sepia: false, invert: false,
+    rotation: 0, flipH: 1, flipV: 1
+  };
+  
+  function resetBaseEdits() {
+    baseEdits = { brightness: 100, contrast: 100, saturation: 100, blur: 0, grayscale: false, sepia: false, invert: false, rotation: 0, flipH: 1, flipV: 1 };
+    sliderBrightness.value = 100;
+    sliderContrast.value = 100;
+    sliderSaturation.value = 100;
+    sliderBlur.value = 0;
+    updateSliderLabels();
+  }
+  
+  function updateSliderLabels() {
+    document.getElementById("val-brightness").textContent = sliderBrightness.value + "%";
+    document.getElementById("val-contrast").textContent = sliderContrast.value + "%";
+    document.getElementById("val-saturation").textContent = sliderSaturation.value + "%";
+    document.getElementById("val-blur").textContent = sliderBlur.value + "px";
+  }
+  
+  window.loadIntoEditor = (imageSrc, parentId = null) => {
+    switchTab("edit");
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      sourceImage = img;
+      originalImageSrc = imageSrc;
+      editCompareImg.src = originalImageSrc;
+      currentParentId = parentId;
+      resetBaseEdits();
+      editHistory = [imageSrc];
+      
+      editEmptyState.classList.add("hidden");
+      editCanvas.classList.remove("hidden");
+      editImageActions.classList.remove("hidden");
+      editAiApplyBtn.disabled = false;
+      editSaveGalleryBtn.disabled = false;
+      editDownloadBtn.disabled = false;
+      
+      drawCanvas();
+    };
+    img.src = imageSrc;
+  };
+  
+  window.resizeEditCanvas = () => {
+    if (sourceImage) drawCanvas();
+  };
+  
+  editUploadBtn.addEventListener("click", () => editFileInput.click());
+  editFileInput.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files[0]) handleEditFile(e.target.files[0]);
+  });
+  
+  editDropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    editDropZone.classList.add("drag-over");
+  });
+  editDropZone.addEventListener("dragleave", () => {
+    editDropZone.classList.remove("drag-over");
+  });
+  editDropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    editDropZone.classList.remove("drag-over");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleEditFile(e.dataTransfer.files[0]);
+  });
+  
+  function handleEditFile(file) {
+    if (!file.type.match(/image\/(png|jpeg|webp)/)) {
+      alert("Invalid file type. Please upload a PNG, JPEG, or WEBP.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      alert("File is too large (max 8 MB).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      window.loadIntoEditor(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  }
+  
+  function drawCanvas() {
+    if (!sourceImage) return;
+    
+    let rad = baseEdits.rotation * Math.PI / 180;
+    let cos = Math.abs(Math.cos(rad));
+    let sin = Math.abs(Math.sin(rad));
+    let w = sourceImage.width * cos + sourceImage.height * sin;
+    let h = sourceImage.width * sin + sourceImage.height * cos;
+    
+    const containerW = editDropZone.clientWidth - 40;
+    const containerH = editDropZone.clientHeight - 40;
+    
+    let scale = Math.min(containerW / w, containerH / h);
+    if (scale > 1) scale = 1;
+    
+    editCanvas.width = w * scale;
+    editCanvas.height = h * scale;
+    
+    editCtx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+    editCtx.save();
+    
+    editCtx.translate(editCanvas.width / 2, editCanvas.height / 2);
+    editCtx.rotate(rad);
+    editCtx.scale(baseEdits.flipH * scale, baseEdits.flipV * scale);
+    
+    let filterStr = `brightness(${baseEdits.brightness}%) contrast(${baseEdits.contrast}%) saturate(${baseEdits.saturation}%) blur(${baseEdits.blur}px)`;
+    if (baseEdits.grayscale) filterStr += " grayscale(100%)";
+    if (baseEdits.sepia) filterStr += " sepia(100%)";
+    if (baseEdits.invert) filterStr += " invert(100%)";
+    editCtx.filter = filterStr;
+    
+    editCtx.drawImage(sourceImage, -sourceImage.width / 2, -sourceImage.height / 2);
+    editCtx.restore();
+  }
+  
+  toolRotLeft.addEventListener("click", () => { baseEdits.rotation -= 90; drawCanvas(); });
+  toolRotRight.addEventListener("click", () => { baseEdits.rotation += 90; drawCanvas(); });
+  toolFlipH.addEventListener("click", () => { baseEdits.flipH *= -1; drawCanvas(); });
+  toolFlipV.addEventListener("click", () => { baseEdits.flipV *= -1; drawCanvas(); });
+  
+  [sliderBrightness, sliderContrast, sliderSaturation, sliderBlur].forEach(el => {
+    el.addEventListener("input", () => {
+      baseEdits[el.id.replace("slider-", "")] = parseInt(el.value);
+      updateSliderLabels();
+      drawCanvas();
+    });
+  });
+  
+  filterGrayscale.addEventListener("click", () => { baseEdits.grayscale = !baseEdits.grayscale; drawCanvas(); });
+  filterSepia.addEventListener("click", () => { baseEdits.sepia = !baseEdits.sepia; drawCanvas(); });
+  filterInvert.addEventListener("click", () => { baseEdits.invert = !baseEdits.invert; drawCanvas(); });
+  
+  editResetBtn.addEventListener("click", () => { resetBaseEdits(); drawCanvas(); });
+  
+  editCompareBtn.addEventListener("mousedown", () => editCompareOverlay.classList.remove("hidden"));
+  editCompareBtn.addEventListener("mouseup", () => editCompareOverlay.classList.add("hidden"));
+  editCompareBtn.addEventListener("mouseleave", () => editCompareOverlay.classList.add("hidden"));
+  editCompareBtn.addEventListener("touchstart", () => editCompareOverlay.classList.remove("hidden"));
+  editCompareBtn.addEventListener("touchend", () => editCompareOverlay.classList.add("hidden"));
+  
+  editUndoBtn.addEventListener("click", () => {
+    if (editHistory.length > 1) {
+      editHistory.pop();
+      const lastState = editHistory[editHistory.length - 1];
+      const img = new Image();
+      img.onload = () => {
+        sourceImage = img;
+        resetBaseEdits();
+        drawCanvas();
+      };
+      img.src = lastState;
+    }
+  });
+  
+  editPromptInput.addEventListener("input", () => {
+    editPromptInput.style.height = "auto";
+    editPromptInput.style.height = Math.min(editPromptInput.scrollHeight, 100) + "px";
+  });
+  
+  editChips.forEach(chip => {
+    chip.addEventListener("click", () => {
+      editPromptInput.value = chip.dataset.edit;
+    });
+  });
+  
+  // Custom Select Logic for Edit Model
+  const editModelTrigger = document.getElementById("edit-model-trigger");
+  const editModelOptions = document.getElementById("edit-model-options");
+  const editModelLabel = document.getElementById("edit-model-label");
+  const editModelOpts = document.querySelectorAll(".custom-select-option");
+  
+  editModelTrigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    editModelOptions.classList.toggle("hidden");
+  });
+  
+  document.addEventListener("click", (e) => {
+    if (!editModelTrigger.contains(e.target) && !editModelOptions.contains(e.target)) {
+      editModelOptions.classList.add("hidden");
+    }
+  });
+  
+  editModelOpts.forEach(opt => {
+    opt.addEventListener("click", () => {
+      editModelOpts.forEach(o => o.classList.remove("active"));
+      opt.classList.add("active");
+      editModelLabel.textContent = opt.textContent;
+      editModelSelect.value = opt.dataset.value;
+      editModelOptions.classList.add("hidden");
+    });
+  });
+  
+  editAiApplyBtn.addEventListener("click", async () => {
+    const prompt = editPromptInput.value.trim();
+    if (!prompt || !sourceImage) return;
+    
+    const dataUrl = editCanvas.toDataURL("image/png");
+    
+    editLoadingMsg.classList.remove("hidden");
+    editAiApplyBtn.disabled = true;
+    
+    try {
+      const res = await fetch(`${API_URL}/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: dataUrl,
+          prompt: prompt,
+          model: editModelSelect.value
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to edit image");
+        return;
+      }
+      
+      const img = new Image();
+      img.onload = () => {
+        sourceImage = img;
+        resetBaseEdits();
+        drawCanvas();
+        editHistory.push(data.image);
+        if (editHistory.length > 10) editHistory.shift();
+      };
+      img.src = data.image;
+      
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      editLoadingMsg.classList.add("hidden");
+      editAiApplyBtn.disabled = false;
+    }
+  });
+  
+  editDownloadBtn.addEventListener("click", () => {
+    const dataUrl = editCanvas.toDataURL("image/png");
+    downloadImage(dataUrl, editPromptInput.value.trim() || "EditedImage");
+  });
+  
+  editSaveGalleryBtn.addEventListener("click", async () => {
+    const dataUrl = editCanvas.toDataURL("image/png");
+    const prompt = editPromptInput.value.trim();
+    const savedRecord = await Storage.saveGeneration({
+      image: dataUrl,
+      prompt: prompt || "Edited Image",
+      model: editModelSelect.value,
+      type: "edit",
+      parentId: currentParentId,
+      editPrompt: prompt
+    });
+    
+    if (savedRecord) {
+      loadHistory();
+      renderGallery();
+      window.showToast("Saved to gallery successfully!");
+    }
+  });
 
 })();

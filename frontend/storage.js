@@ -95,6 +95,8 @@ const Storage = (() => {
         style: record.style || "none",
         width: record.width || 1024,
         height: record.height || 1024,
+        type: record.type || "generate",
+        parentId: record.parentId || null,
         favorite: false,
         createdAt: Date.now(),
       };

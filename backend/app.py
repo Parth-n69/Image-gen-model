@@ -1,6 +1,7 @@
 import os
 import base64
 import io
+from PIL import Image
 from datetime import date
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -22,6 +23,11 @@ MODELS = {
     "sdxl":         "stabilityai/stable-diffusion-xl-base-1.0",
 }
 DEFAULT_MODEL = "flux-schnell"
+
+EDIT_MODELS = {
+    "kontext": { "id": "black-forest-labs/FLUX.1-Kontext-dev", "provider": "replicate" },
+    "qwen-edit": { "id": "Qwen/Qwen-Image-Edit", "provider": "fal-ai" }
+}
 
 # ── Daily rate-limiting config ─────────────────────────────────
 DAILY_LIMIT = 4
@@ -173,6 +179,85 @@ def generate_image():
         "daily_limit": DAILY_LIMIT,
         "model": model_key,
     }), 200
+
+
+@app.route("/edit", methods=["POST"])
+def edit_image():
+    """Edit an image using HF Inference API with provider routing."""
+    data = request.get_json(silent=True)
+    if not data or not data.get("prompt", "").strip():
+        return jsonify({"error": "Prompt is required and cannot be empty."}), 400
+    if not data.get("image"):
+        return jsonify({"error": "Image is required."}), 400
+
+    img_data_str = data["image"]
+    if img_data_str.startswith("data:image"):
+        try:
+            img_data_str = img_data_str.split(",")[1]
+        except IndexError:
+            return jsonify({"error": "Invalid image format."}), 400
+
+    try:
+        img_bytes = base64.b64decode(img_data_str)
+    except Exception:
+        return jsonify({"error": "Invalid base64 image data."}), 400
+
+    if len(img_bytes) > 8 * 1024 * 1024:
+        return jsonify({"error": "Image is too large (max 8 MB)."}), 413
+
+    try:
+        img = Image.open(io.BytesIO(img_bytes))
+        if img.format not in ["PNG", "JPEG", "WEBP"]:
+            return jsonify({"error": f"Image must be PNG, JPEG, or WEBP. Got {img.format}"}), 400
+    except Exception:
+        return jsonify({"error": "Invalid image file."}), 400
+
+    # Resize so longest side <= 1024
+    longest_side = max(img.width, img.height)
+    if longest_side > 1024:
+        ratio = 1024 / longest_side
+        new_w = int(img.width * ratio)
+        new_h = int(img.height * ratio)
+        img = img.resize((new_w, new_h), Image.LANCZOS)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    processed_img_bytes = buf.getvalue()
+
+    prompt = data["prompt"].strip()
+    model_key = data.get("model", "kontext")
+    if model_key not in EDIT_MODELS:
+        model_key = "kontext"
+
+    primary_model = EDIT_MODELS[model_key]
+    fallback_model_key = "qwen-edit" if model_key == "kontext" else "kontext"
+    fallback_model = EDIT_MODELS[fallback_model_key]
+
+    def try_edit(model_info):
+        client = InferenceClient(provider=model_info["provider"], api_key=HF_API_KEY)
+        return client.image_to_image(processed_img_bytes, prompt=prompt, model=model_info["id"])
+
+    try:
+        result_img = try_edit(primary_model)
+    except Exception as e1:
+        print(f"Primary edit failed: {e1}")
+        try:
+            result_img = try_edit(fallback_model)
+        except Exception as e2:
+            print(f"Fallback edit failed: {e2}")
+            err_str = str(e1).lower() + " " + str(e2).lower()
+            if "401" in err_str or "403" in err_str or "unauthorized" in err_str or "permission" in err_str:
+                return jsonify({"error": "Check your Hugging Face token"}), 401
+            if "402" in err_str or "429" in err_str or "payment" in err_str or "credits" in err_str or "quota" in err_str:
+                return jsonify({"error": "Free monthly credits used up. Try again later or use the basic tools."}), 402
+            if "503" in err_str or "timeout" in err_str or "loading" in err_str or "busy" in err_str:
+                return jsonify({"error": "Model is busy, try again"}), 503
+            return jsonify({"error": "Failed to edit image."}), 500
+
+    out_buf = io.BytesIO()
+    result_img.save(out_buf, format="PNG")
+    b64_string = base64.b64encode(out_buf.getvalue()).decode("utf-8")
+    return jsonify({"image": f"data:image/png;base64,{b64_string}"}), 200
 
 
 if __name__ == "__main__":

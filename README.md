@@ -105,6 +105,19 @@ Simply open `frontend/index.html` in your browser:
 4. Wait 10-30 seconds (longer on cold starts when the model is loading)
 5. View and **download** your generated image as a PNG
 
+### Image Editing
+
+The new **Edit Tab** allows you to modify your existing images or generated creations:
+1. Upload an image, drag-and-drop one, or click **"Edit this image"** on any generated result in the chat or gallery.
+2. **AI Magic Edit:** Describe the change (e.g. "make it winter") and apply it using models like FLUX Kontext.
+   > ⚠️ **Note:** AI edits use the Hugging Face Inference API which consumes your limited free account credits. If your credits run out, the AI edit will fail.
+3. **Basic Tools:** You can always use the built-in basic tools—these run entirely in your browser and work even if AI credits are exhausted:
+   - Rotate, flip
+   - Adjust Brightness, Contrast, Saturation, Blur
+   - Apply filters (Grayscale, Sepia, Invert)
+4. Compare your edits with the original image using the **Compare (Hold)** button.
+5. Save your edits directly to the Gallery (they will appear with an "Edited" badge) or download them.
+
 ### Generation History & Gallery
 
 Every successful generation is **automatically saved** to your browser's IndexedDB storage (which can hold hundreds of images, unlike localStorage).
