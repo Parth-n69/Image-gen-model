@@ -233,6 +233,12 @@
     "sdxl":         "Stable Diffusion XL",
   };
 
+  // Reverse lookup: label → model key
+  const MODEL_KEYS = {};
+  for (const [key, label] of Object.entries(MODEL_LABELS)) {
+    MODEL_KEYS[label] = key;
+  }
+
   // ── DOM REFS ──────────────────────────────────────────────
   const sidebar        = document.getElementById("sidebar");
   const toggleSidebar  = document.getElementById("toggle-sidebar");
@@ -268,10 +274,53 @@
   // Preset buttons (sidebar + welcome chips)
   const presets = document.querySelectorAll("[data-prompt]");
 
+  // Tab system
+  const tabBtns = document.querySelectorAll(".tab-btn");
+  const tabGenerate = document.getElementById("tab-generate");
+  const tabGallery = document.getElementById("tab-gallery");
+  const tabContentGenerate = document.getElementById("tab-content-generate");
+  const tabContentGallery = document.getElementById("tab-content-gallery");
+  const galleryCountEl = document.getElementById("gallery-count");
+
+  // Gallery
+  const galleryGrid = document.getElementById("gallery-grid");
+  const galleryEmpty = document.getElementById("gallery-empty");
+  const galleryFilterBtns = document.querySelectorAll(".gallery-filter-btn");
+  const galleryClearBtn = document.getElementById("gallery-clear-btn");
+  const galleryEmptyGenerateBtn = document.getElementById("gallery-empty-generate-btn");
+
+  // Lightbox
+  const lightboxOverlay = document.getElementById("lightbox-overlay");
+  const lightboxModal = document.getElementById("lightbox-modal");
+  const lightboxClose = document.getElementById("lightbox-close");
+  const lightboxImage = document.getElementById("lightbox-image");
+  const lightboxPrompt = document.getElementById("lightbox-prompt");
+  const lightboxNegPrompt = document.getElementById("lightbox-neg-prompt");
+  const lightboxNegSection = document.getElementById("lightbox-neg-section");
+  const lightboxModel = document.getElementById("lightbox-model");
+  const lightboxStyle = document.getElementById("lightbox-style");
+  const lightboxSize = document.getElementById("lightbox-size");
+  const lightboxReuseBtn = document.getElementById("lightbox-reuse-btn");
+  const lightboxDownloadBtn = document.getElementById("lightbox-download-btn");
+  const lightboxFavBtn = document.getElementById("lightbox-fav-btn");
+  const lightboxDeleteBtn = document.getElementById("lightbox-delete-btn");
+
+  // Confirm dialog
+  const confirmOverlay = document.getElementById("confirm-overlay");
+  const confirmTitle = document.getElementById("confirm-title");
+  const confirmMessage = document.getElementById("confirm-message");
+  const confirmExtra = document.getElementById("confirm-extra");
+  const confirmCancel = document.getElementById("confirm-cancel");
+  const confirmOk = document.getElementById("confirm-ok");
+
   // ── STATE ─────────────────────────────────────────────────
   let isGenerating = false;
   let selectedModel = "flux-schnell";
   let isChatActive = false;   // tracks whether we're in chat mode
+  let activeTab = "generate"; // "generate" or "gallery"
+  let galleryFilter = "all";  // "all" or "favorites"
+  let currentLightboxRecord = null; // the record currently shown in lightbox
+  let _confirmResolve = null; // for the confirm dialog promise
 
   // ── INIT ──────────────────────────────────────────────────
   fetchCredits();
@@ -341,8 +390,41 @@
     });
   });
 
+  // ── TAB NAVIGATION ───────────────────────────────────────
+  tabBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      switchTab(btn.dataset.tab);
+    });
+  });
+
+  function switchTab(tabName) {
+    activeTab = tabName;
+
+    // Update tab button states
+    tabBtns.forEach(b => b.classList.remove("active"));
+    if (tabName === "generate") {
+      tabGenerate.classList.add("active");
+      tabContentGenerate.classList.add("active");
+      tabContentGallery.classList.remove("active");
+    } else {
+      tabGallery.classList.add("active");
+      tabContentGallery.classList.add("active");
+      tabContentGenerate.classList.remove("active");
+      renderGallery();
+    }
+  }
+
+  // "Start Creating" button in empty gallery
+  galleryEmptyGenerateBtn?.addEventListener("click", () => {
+    switchTab("generate");
+    resetChat();
+  });
+
   // ── NEW CHAT ──────────────────────────────────────────────
-  newChatBtn?.addEventListener("click", resetChat);
+  newChatBtn?.addEventListener("click", () => {
+    switchTab("generate");
+    resetChat();
+  });
 
   function resetChat() {
     chatMessages.innerHTML = "";
@@ -399,6 +481,9 @@
     btn.addEventListener("click", () => {
       const prompt = btn.dataset.prompt;
       if (prompt && !isGenerating) {
+        // Make sure we're on the Generate tab
+        if (activeTab !== "generate") switchTab("generate");
+
         const input = getActivePromptInput();
         input.value = prompt;
         autoResizeInput(input);
@@ -482,8 +567,14 @@
 
   // Close on Escape
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !modalOverlay.classList.contains("hidden")) {
-      closeModelModal();
+    if (e.key === "Escape") {
+      if (!lightboxOverlay.classList.contains("hidden")) {
+        closeLightbox();
+      } else if (!confirmOverlay.classList.contains("hidden")) {
+        resolveConfirm(false);
+      } else if (!modalOverlay.classList.contains("hidden")) {
+        closeModelModal();
+      }
     }
   });
 
@@ -538,49 +629,18 @@
     }
   }
 
-  // ── LOCALSTORAGE HISTORY ──────────────────────────────────
-  function saveHistoryEntry(prompt, imageDataUri) {
-    let history = [];
-    try {
-      history = JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
-    } catch { /* ignore */ }
-
-    history.unshift({
-      prompt,
-      image: imageDataUri,
-      timestamp: Date.now(),
-    });
-
-    // Keep only the last MAX_HISTORY items
-    if (history.length > MAX_HISTORY) {
-      history = history.slice(0, MAX_HISTORY);
-    }
-
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-    } catch (e) {
-      // If localStorage is full (base64 images are large), remove oldest entries
-      while (history.length > 1) {
-        history.pop();
-        try {
-          localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-          break;
-        } catch { /* keep trying */ }
-      }
-    }
-  }
-
-  function loadHistory() {
-    let history = [];
-    try {
-      history = JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
-    } catch { /* ignore */ }
-
-    // Populate sidebar
+  // ── SIDEBAR HISTORY (from IndexedDB) ─────────────────────
+  async function loadHistory() {
     sidebarHistory.innerHTML = "";
-    history.forEach(entry => {
-      addToSidebarHistory(entry.prompt, entry.image, entry.timestamp);
-    });
+    try {
+      const records = await Storage.getAllGenerations();
+      records.forEach(record => {
+        addToSidebarHistory(record.prompt, record.image, record.createdAt);
+      });
+      updateGalleryCount(records.length);
+    } catch {
+      // Storage unavailable — sidebar stays empty
+    }
   }
 
   // ── MESSAGE RENDERING ────────────────────────────────────
@@ -718,6 +778,9 @@
 
     isGenerating = true;
 
+    // Make sure we're on the Generate tab
+    if (activeTab !== "generate") switchTab("generate");
+
     // Switch to chat mode (shows bottom input, hides welcome)
     activateChatMode();
 
@@ -808,10 +871,23 @@
       const shortPrompt = prompt.slice(0, 60) + (prompt.length > 60 ? "…" : "");
       replaceMessage(aiMsg, "ai", `Here's your image for "${shortPrompt}"`, { image: data.image });
 
-      // Save to history (persists across refresh)
-      saveHistoryEntry(prompt, data.image);
-      // Update sidebar
+      // ── Auto-save to IndexedDB ──
+      const savedRecord = await Storage.saveGeneration({
+        image: data.image,
+        prompt: prompt,
+        negativePrompt: negativePrompt,
+        model: selectedModel,
+        style: activeStyle,
+        width: width,
+        height: height,
+      });
+
+      // Update sidebar history
       addToSidebarHistory(prompt, data.image, Date.now(), true);
+
+      // Update gallery count
+      const allRecords = await Storage.getAllGenerations();
+      updateGalleryCount(allRecords.length);
 
     } catch (err) {
       if (err instanceof TypeError) {
@@ -845,6 +921,9 @@
 
     // Clicking a history item shows it in chat
     el.addEventListener("click", () => {
+      // Make sure we're on the Generate tab
+      if (activeTab !== "generate") switchTab("generate");
+
       // Clear chat and show this conversation
       chatMessages.innerHTML = "";
       chatMessages.appendChild(welcomeScreen);
@@ -882,6 +961,351 @@
     if (diffDay < 7) return `${diffDay}d ago`;
     return d.toLocaleDateString();
   }
+
+  // ── GALLERY ───────────────────────────────────────────────
+
+  function updateGalleryCount(count) {
+    if (galleryCountEl) {
+      galleryCountEl.textContent = count > 0 ? `(${count})` : "";
+    }
+  }
+
+  // Filter buttons
+  galleryFilterBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      galleryFilter = btn.dataset.filter;
+      galleryFilterBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderGallery();
+    });
+  });
+
+  // Clear all button
+  galleryClearBtn?.addEventListener("click", async () => {
+    const records = await Storage.getAllGenerations();
+    const favCount = records.filter(r => r.favorite).length;
+    const total = records.length;
+
+    if (total === 0) return;
+
+    let extraHTML = "";
+    if (favCount > 0) {
+      extraHTML = `
+        <label class="confirm-checkbox-label">
+          <input type="checkbox" id="confirm-include-favs" />
+          <span>Also delete ${favCount} favorited image${favCount > 1 ? "s" : ""}</span>
+        </label>
+      `;
+    }
+
+    const confirmed = await showConfirm(
+      "Clear All History",
+      `This will delete ${total - favCount} image${total - favCount !== 1 ? "s" : ""} from your history.${favCount > 0 ? " Favorites are kept by default." : ""}`,
+      "Delete",
+      extraHTML
+    );
+
+    if (!confirmed) return;
+
+    const includeFavs = favCount > 0 && document.getElementById("confirm-include-favs")?.checked;
+    await Storage.clearAll(includeFavs);
+
+    renderGallery();
+    loadHistory();
+  });
+
+  async function renderGallery() {
+    const records = await Storage.getAllGenerations();
+    let filtered = records;
+
+    if (galleryFilter === "favorites") {
+      filtered = records.filter(r => r.favorite);
+    }
+
+    updateGalleryCount(records.length);
+
+    galleryGrid.innerHTML = "";
+
+    if (filtered.length === 0) {
+      galleryGrid.classList.add("hidden");
+      galleryEmpty.classList.remove("hidden");
+
+      if (galleryFilter === "favorites") {
+        galleryEmpty.querySelector("h3").textContent = "No favorites yet";
+        galleryEmpty.querySelector("p").textContent = "Star some images to find them here.";
+        galleryEmptyGenerateBtn.classList.add("hidden");
+      } else {
+        galleryEmpty.querySelector("h3").textContent = "No images yet";
+        galleryEmpty.querySelector("p").textContent = "Go generate something amazing! Your creations will appear here.";
+        galleryEmptyGenerateBtn.classList.remove("hidden");
+      }
+      return;
+    }
+
+    galleryGrid.classList.remove("hidden");
+    galleryEmpty.classList.add("hidden");
+
+    filtered.forEach(record => {
+      const card = createGalleryCard(record);
+      galleryGrid.appendChild(card);
+    });
+  }
+
+  function createGalleryCard(record) {
+    const card = document.createElement("div");
+    card.classList.add("gallery-card");
+    card.dataset.id = record.id;
+
+    const truncatedPrompt = record.prompt.length > 60
+      ? record.prompt.slice(0, 60) + "…"
+      : record.prompt;
+
+    const modelLabel = MODEL_LABELS[record.model] || record.model || "Unknown";
+    const styleLabel = record.style && record.style !== "none" ? record.style : "";
+
+    card.innerHTML = `
+      <div class="gallery-card-image">
+        <img src="${record.image}" alt="${escapeHtml(record.prompt)}" loading="lazy" />
+        <div class="gallery-card-overlay">
+          <button class="gallery-card-action fav-btn ${record.favorite ? "active" : ""}" data-action="fav" title="Favorite">
+            <svg viewBox="0 0 24 24" fill="${record.favorite ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+          <button class="gallery-card-action" data-action="download" title="Download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          </button>
+          <button class="gallery-card-action danger" data-action="delete" title="Delete">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="gallery-card-info">
+        <div class="gallery-card-prompt">${escapeHtml(truncatedPrompt)}</div>
+        <div class="gallery-card-meta">
+          <span class="gallery-card-model">${escapeHtml(modelLabel)}</span>
+          ${styleLabel ? `<span class="gallery-card-style">${escapeHtml(styleLabel)}</span>` : ""}
+        </div>
+      </div>
+    `;
+
+    // Click on image → open lightbox
+    const imgEl = card.querySelector(".gallery-card-image img");
+    imgEl.addEventListener("click", () => openLightbox(record));
+
+    // Action buttons
+    card.querySelector('[data-action="fav"]').addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const newState = await Storage.toggleFavorite(record.id);
+      if (newState !== null) {
+        record.favorite = newState;
+        renderGallery(); // re-render to update icons
+      }
+    });
+
+    card.querySelector('[data-action="download"]').addEventListener("click", (e) => {
+      e.stopPropagation();
+      downloadImage(record.image, record.prompt);
+    });
+
+    card.querySelector('[data-action="delete"]').addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const confirmed = await showConfirm(
+        "Delete Image",
+        "Are you sure you want to delete this image? This cannot be undone.",
+        "Delete"
+      );
+      if (confirmed) {
+        await Storage.deleteGeneration(record.id);
+        renderGallery();
+        loadHistory();
+      }
+    });
+
+    return card;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ── LIGHTBOX ──────────────────────────────────────────────
+
+  function openLightbox(record) {
+    currentLightboxRecord = record;
+
+    lightboxImage.src = record.image;
+    lightboxPrompt.textContent = record.prompt;
+
+    if (record.negativePrompt) {
+      lightboxNegPrompt.textContent = record.negativePrompt;
+      lightboxNegSection.classList.remove("hidden");
+    } else {
+      lightboxNegSection.classList.add("hidden");
+    }
+
+    lightboxModel.textContent = MODEL_LABELS[record.model] || record.model || "Unknown";
+    lightboxStyle.textContent = record.style && record.style !== "none" ? record.style : "None";
+    lightboxSize.textContent = `${record.width} × ${record.height}`;
+
+    // Update fav button state
+    updateLightboxFavBtn(record.favorite);
+
+    lightboxOverlay.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeLightbox() {
+    lightboxOverlay.classList.add("hidden");
+    document.body.style.overflow = "";
+    currentLightboxRecord = null;
+  }
+
+  function updateLightboxFavBtn(isFav) {
+    const svgEl = lightboxFavBtn.querySelector("svg");
+    const spanEl = lightboxFavBtn.querySelector("span");
+    if (isFav) {
+      lightboxFavBtn.classList.add("active");
+      svgEl.setAttribute("fill", "currentColor");
+      spanEl.textContent = "Favorited";
+    } else {
+      lightboxFavBtn.classList.remove("active");
+      svgEl.setAttribute("fill", "none");
+      spanEl.textContent = "Favorite";
+    }
+  }
+
+  lightboxClose?.addEventListener("click", closeLightbox);
+
+  // Close on overlay click
+  lightboxOverlay?.addEventListener("click", (e) => {
+    if (e.target === lightboxOverlay) closeLightbox();
+  });
+
+  // Reuse settings
+  lightboxReuseBtn?.addEventListener("click", () => {
+    if (!currentLightboxRecord) return;
+    const rec = currentLightboxRecord;
+
+    closeLightbox();
+    switchTab("generate");
+    resetChat();
+
+    // Fill in the prompt
+    const input = getActivePromptInput();
+    input.value = rec.prompt;
+    autoResizeInput(input);
+    updateCharCount(getActiveCharCount(), input);
+    updateSendBtn(getActiveSendBtn(), input);
+
+    // Set negative prompt
+    if (negativePromptInput) {
+      negativePromptInput.value = rec.negativePrompt || "";
+    }
+
+    // Set model
+    if (rec.model && MODEL_LABELS[rec.model]) {
+      selectedModel = rec.model;
+      modelCards.forEach(c => {
+        c.classList.toggle("active", c.dataset.model === selectedModel);
+      });
+      syncModelUI();
+    }
+
+    // Set style
+    if (rec.style) {
+      activeStyle = rec.style;
+      stylePresetsBtns.forEach(b => {
+        b.classList.toggle("active", b.dataset.style === activeStyle);
+      });
+    }
+
+    // Set aspect ratio
+    const ratioStr = `${rec.width}x${rec.height}`;
+    activeRatio = ratioStr;
+    aspectRatioBtns.forEach(b => {
+      b.classList.toggle("active", b.dataset.ratio === ratioStr);
+    });
+
+    // Show options panel if there are non-default settings
+    const hasCustomSettings = rec.style !== "none" || rec.negativePrompt || ratioStr !== "1024x1024";
+    if (hasCustomSettings && !isOptionsOpen) {
+      isOptionsOpen = true;
+      optionsPanel.classList.remove("hidden");
+      optionsToggleBtns.forEach(b => b.classList.add("active"));
+    }
+
+    input.focus();
+  });
+
+  // Download from lightbox
+  lightboxDownloadBtn?.addEventListener("click", () => {
+    if (currentLightboxRecord) {
+      downloadImage(currentLightboxRecord.image, currentLightboxRecord.prompt);
+    }
+  });
+
+  // Favorite from lightbox
+  lightboxFavBtn?.addEventListener("click", async () => {
+    if (!currentLightboxRecord) return;
+    const newState = await Storage.toggleFavorite(currentLightboxRecord.id);
+    if (newState !== null) {
+      currentLightboxRecord.favorite = newState;
+      updateLightboxFavBtn(newState);
+    }
+  });
+
+  // Delete from lightbox
+  lightboxDeleteBtn?.addEventListener("click", async () => {
+    if (!currentLightboxRecord) return;
+    const confirmed = await showConfirm(
+      "Delete Image",
+      "Are you sure you want to delete this image? This cannot be undone.",
+      "Delete"
+    );
+    if (confirmed) {
+      await Storage.deleteGeneration(currentLightboxRecord.id);
+      closeLightbox();
+      renderGallery();
+      loadHistory();
+    }
+  });
+
+  // ── CONFIRM DIALOG ───────────────────────────────────────
+
+  function showConfirm(title, message, okText = "OK", extraHTML = "") {
+    confirmTitle.textContent = title;
+    confirmMessage.textContent = message;
+    confirmOk.textContent = okText;
+
+    if (extraHTML) {
+      confirmExtra.innerHTML = extraHTML;
+      confirmExtra.classList.remove("hidden");
+    } else {
+      confirmExtra.innerHTML = "";
+      confirmExtra.classList.add("hidden");
+    }
+
+    confirmOverlay.classList.remove("hidden");
+
+    return new Promise(resolve => {
+      _confirmResolve = resolve;
+    });
+  }
+
+  function resolveConfirm(value) {
+    confirmOverlay.classList.add("hidden");
+    if (_confirmResolve) {
+      _confirmResolve(value);
+      _confirmResolve = null;
+    }
+  }
+
+  confirmOk?.addEventListener("click", () => resolveConfirm(true));
+  confirmCancel?.addEventListener("click", () => resolveConfirm(false));
+  confirmOverlay?.addEventListener("click", (e) => {
+    if (e.target === confirmOverlay) resolveConfirm(false);
+  });
 
   // ── DOWNLOAD (saves to Downloads folder) ──────────────────
   function downloadImage(dataUri, promptText) {

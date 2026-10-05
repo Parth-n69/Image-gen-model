@@ -20,7 +20,8 @@ image-gen-model/
 ├── frontend/
 │   ├── index.html          # Main UI page
 │   ├── style.css           # Dark-theme styles
-│   └── script.js           # Client-side logic
+│   ├── script.js           # Client-side logic (generation, gallery, lightbox)
+│   └── storage.js          # IndexedDB storage module for generation history
 └── README.md
 ```
 
@@ -93,6 +94,8 @@ Simply open `frontend/index.html` in your browser:
 
 ## 🎨 Usage
 
+### Generating Images
+
 1. Type a descriptive prompt (e.g., *"A cyberpunk city at sunset, neon lights, ultra detailed"*)
 2. (Optional) Open the **Options** panel to select:
    - **Style Preset:** Quickly apply a specific artistic style (e.g., Anime, Realistic Photo).
@@ -101,6 +104,23 @@ Simply open `frontend/index.html` in your browser:
 3. Click **Generate** (or press Enter)
 4. Wait 10-30 seconds (longer on cold starts when the model is loading)
 5. View and **download** your generated image as a PNG
+
+### Generation History & Gallery
+
+Every successful generation is **automatically saved** to your browser's IndexedDB storage (which can hold hundreds of images, unlike localStorage).
+
+- **Gallery Tab:** Switch to the Gallery tab to browse all your past generations in a responsive grid layout.
+- **Favorites:** Star ⭐ any image to mark it as a favorite. Use the "Favorites" filter to view only starred images.
+- **Lightbox:** Click any gallery image to open a detailed view showing the full image and all generation settings (prompt, negative prompt, model, style, size).
+- **Reuse Settings:** In the lightbox, click "Reuse Settings" to copy all settings from a past generation back into the Generate tab — perfect for iterating on a concept.
+- **Delete:** Remove individual images (with confirmation), or use "Clear All" to remove all history (favorites are kept by default).
+- **Download:** Download any image from the gallery or lightbox.
+
+### Storage
+
+- Images are stored in **IndexedDB** (not localStorage), which can handle hundreds of large base64 images.
+- If IndexedDB is unavailable (e.g., in private browsing), the app still works — you just won't have persistent history. A warning toast will appear.
+- Data is stored locally in your browser only. Clearing browser data will remove your history.
 
 ---
 
@@ -117,6 +137,7 @@ Simply open `frontend/index.html` in your browser:
 | Layer    | Technology                                      |
 |----------|------------------------------------------------|
 | Frontend | HTML5, CSS3, vanilla JavaScript                 |
+| Storage  | IndexedDB (via `storage.js` module)             |
 | Backend  | Python, Flask, flask-cors                       |
 | AI Model | Stable Diffusion XL (via Hugging Face API)      |
 | Styling  | Custom dark theme with glassmorphism & animations|
