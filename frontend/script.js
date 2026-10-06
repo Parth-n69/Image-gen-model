@@ -3,7 +3,7 @@
 
   // ── CONFIG ────────────────────────────────────────────────
   const API_URL = "http://127.0.0.1:5000";
-  const HISTORY_KEY = "neuralcanvas_history";
+  const HISTORY_KEY = "pixable_history";
   const MAX_HISTORY = 50;
 
   // ── THEME LOGIC ───────────────────────────────────────────
@@ -719,7 +719,7 @@
 
     const label = document.createElement("div");
     label.classList.add("msg-label");
-    label.textContent = role === "user" ? "You" : "NeuralCanvas";
+    label.textContent = role === "user" ? "You" : "Pixable";
 
     body.appendChild(label);
 
@@ -1415,11 +1415,11 @@
     if (!dataUri) return;
 
     // Create a proper filename
-    const safeName = (promptText || "NeuralCanvas_image")
+    const safeName = (promptText || "Pixable_image")
       .replace(/[^a-zA-Z0-9 ]/g, "")
       .replace(/\s+/g, "_")
-      .slice(0, 60) || "NeuralCanvas_image";
-    const fileName = `NeuralCanvas_${safeName}.png`;
+      .slice(0, 60) || "Pixable_image";
+    const fileName = `Pixable_${safeName}.png`;
 
     // For data URIs, convert to blob for a cleaner download
     if (dataUri.startsWith("data:")) {

@@ -1,5 +1,5 @@
 /**
- * storage.js — IndexedDB-backed storage for NeuralCanvas generation history.
+ * storage.js — IndexedDB-backed storage for Pixable generation history.
  *
  * Base64 images are 1-2 MB each and localStorage only holds ~5 MB,
  * so we use IndexedDB which can store hundreds of megabytes.
@@ -10,7 +10,7 @@
 const Storage = (() => {
   "use strict";
 
-  const DB_NAME = "NeuralCanvasDB";
+  const DB_NAME = "PixableDB";
   const DB_VERSION = 1;
   const STORE_NAME = "generations";
 

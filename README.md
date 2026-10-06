@@ -1,4 +1,4 @@
-# NeuralCanvas — AI Image Generator
+# Pixable — AI Image Generator
 
 Generate stunning images from text prompts using **Stable Diffusion XL** via the Hugging Face Inference API. Built with a Flask backend and vanilla HTML/CSS/JS frontend.
 
