@@ -1,5 +1,5 @@
 /**
- * storage.js — IndexedDB-backed storage for Pixable generation history.
+ * storage.js — IndexedDB-backed storage for Pixabel generation history.
  *
  * Base64 images are 1-2 MB each and localStorage only holds ~5 MB,
  * so we use IndexedDB which can store hundreds of megabytes.

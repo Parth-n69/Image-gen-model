@@ -1,4 +1,4 @@
-# Pixable — AI Image Generator
+# Pixabel — AI Image Generator
 
 Generate stunning images from text prompts using **Stable Diffusion XL** via the Hugging Face Inference API. Built with a Flask backend and vanilla HTML/CSS/JS frontend.
 
@@ -134,6 +134,38 @@ Every successful generation is **automatically saved** to your browser's Indexed
 - Images are stored in **IndexedDB** (not localStorage), which can handle hundreds of large base64 images.
 - If IndexedDB is unavailable (e.g., in private browsing), the app still works — you just won't have persistent history. A warning toast will appear.
 - Data is stored locally in your browser only. Clearing browser data will remove your history.
+
+## 💎 Theming (Modern Luxury)
+
+The UI is built with a modern luxury aesthetic—minimalist, elegant, and highly customizable. All colors and sizing are controlled by CSS variables located in `frontend/style.css`.
+
+### Customizing the Theme
+
+To tweak the design, update the variables in `:root` (for Dark mode) and `[data-theme="light"]`. The most important variable is the singular accent color (champagne gold).
+
+```css
+:root {
+  --bg: #0a0a0b;
+  --surface: #111113;
+  --text: #f2efe9;
+  --gold: #d4af37; /* Primary Accent Color */
+  --gold-hover: #e6c76a;
+  --on-gold: #14110a;
+}
+```
+
+- **Restraint:** The accent color is used sparingly (only for primary actions, focus rings, and active tabs).
+- **Typography:** The app uses *Cormorant Garamond* for beautiful headings and *Inter* for clean UI elements.
+- **Animations:** All transitions use a luxurious slow, smooth curve (`--t-smooth`, `--t-slow`).
+
+### Branding
+
+The Pixabel logo is built entirely from basic geometry and CSS variables. The logo lockups use real HTML text for the "Pixabel" wordmark, allowing it to render perfectly without requiring heavy fonts in the SVG.
+
+To swap the logo:
+1. Replace `frontend/assets/logo-symbol.svg` with your own mark (preferably square, 48x48).
+2. Update the HTML structures in `index.html` (look for `.logo-lockup-horizontal` and `.logo-lockup-stacked`).
+3. Update `frontend/assets/favicon.svg`.
 
 ---
 

@@ -13,10 +13,16 @@
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
     if (themeToggleBtn) {
-      if (theme === "light") {
-        themeToggleBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>';
-      } else {
-        themeToggleBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+      const sunIcon = themeToggleBtn.querySelector(".sun-icon");
+      const moonIcon = themeToggleBtn.querySelector(".moon-icon");
+      if (sunIcon && moonIcon) {
+        if (theme === "light") {
+          sunIcon.style.display = "block";
+          moonIcon.style.display = "none";
+        } else {
+          sunIcon.style.display = "none";
+          moonIcon.style.display = "block";
+        }
       }
     }
   }
@@ -28,6 +34,21 @@
     themeToggleBtn.addEventListener("click", () => {
       const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
       applyTheme(currentTheme === "light" ? "dark" : "light");
+    });
+  }
+
+  const loginBtn = document.getElementById("login-btn");
+  const closeLoginBtn = document.getElementById("close-login-btn");
+  const loginModalOverlay = document.getElementById("login-modal-overlay");
+
+  if (loginBtn && loginModalOverlay) {
+    loginBtn.addEventListener("click", () => {
+      loginModalOverlay.classList.remove("hidden");
+    });
+  }
+  if (closeLoginBtn && loginModalOverlay) {
+    closeLoginBtn.addEventListener("click", () => {
+      loginModalOverlay.classList.add("hidden");
     });
   }
 
@@ -706,7 +727,7 @@
 
     if (role === "ai") {
       const logoImg = document.createElement("img");
-      logoImg.src = "logo.jpg";
+      logoImg.src = "assets/logo.png";
       logoImg.alt = "AI";
       logoImg.classList.add("avatar-logo");
       avatar.appendChild(logoImg);
@@ -719,30 +740,39 @@
 
     const label = document.createElement("div");
     label.classList.add("msg-label");
-    label.textContent = role === "user" ? "You" : "Pixable";
+    label.textContent = role === "user" ? "You" : "Pixabel";
 
     body.appendChild(label);
 
     if (opts.loading) {
       const loadWrap = document.createElement("div");
+      loadWrap.classList.add("loading-shimmer");
+      
+      // Determine aspect ratio if provided in prompt content, otherwise default 1:1
+      loadWrap.style.aspectRatio = "1 / 1";
       loadWrap.style.display = "flex";
       loadWrap.style.alignItems = "center";
-      loadWrap.style.gap = "10px";
+      loadWrap.style.justifyContent = "center";
+      
+      const svgLoader = document.createElement("div");
+      svgLoader.style.width = "48px";
+      svgLoader.style.height = "48px";
+      svgLoader.innerHTML = `
+        <img src="assets/logo.png" alt="Loading" class="loader-pulse-anim" style="width: 100%; height: 100%; object-fit: contain;" />
+      `;
 
-      const dots = document.createElement("div");
-      dots.classList.add("loading-dots");
-      dots.innerHTML = "<span></span><span></span><span></span>";
-      loadWrap.appendChild(dots);
+      loadWrap.appendChild(svgLoader);
 
-      if (content) {
-        const statusText = document.createElement("span");
-        statusText.classList.add("msg-text");
-        statusText.style.fontSize = "0.82rem";
-        statusText.style.color = "var(--text-muted)";
-        statusText.textContent = content;
-        loadWrap.appendChild(statusText);
-      }
+      const statusText = document.createElement("div");
+      statusText.classList.add("loading-shimmer-text");
+      statusText.style.position = "absolute";
+      statusText.style.bottom = "16px";
+      statusText.style.left = "0";
+      statusText.style.right = "0";
+      statusText.style.zIndex = "2";
+      statusText.textContent = content || "GENERATING...";
 
+      loadWrap.appendChild(statusText);
       body.appendChild(loadWrap);
     } else if (opts.error) {
       const err = document.createElement("div");
@@ -1415,11 +1445,11 @@
     if (!dataUri) return;
 
     // Create a proper filename
-    const safeName = (promptText || "Pixable_image")
+    const safeName = (promptText || "Pixabel_image")
       .replace(/[^a-zA-Z0-9 ]/g, "")
       .replace(/\s+/g, "_")
-      .slice(0, 60) || "Pixable_image";
-    const fileName = `Pixable_${safeName}.png`;
+      .slice(0, 60) || "Pixabel_image";
+    const fileName = `Pixabel_${safeName}.png`;
 
     // For data URIs, convert to blob for a cleaner download
     if (dataUri.startsWith("data:")) {
