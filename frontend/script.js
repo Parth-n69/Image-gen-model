@@ -6,6 +6,78 @@
   const HISTORY_KEY = "pixable_history";
   const MAX_HISTORY = 50;
 
+  // ── AUTH & SESSION LOGIC ──────────────────────────────────
+  let supabaseClient = null;
+  let sessionToken = null;
+  
+  if (typeof window.supabase !== 'undefined' && typeof SUPABASE_URL !== 'undefined') {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    supabaseClient.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        sessionToken = session.access_token;
+        updateUserUI(session.user);
+      } else {
+        updateUserUI(null);
+      }
+    });
+
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        sessionToken = null;
+        window.location.replace("login.html");
+      } else if (event === 'SIGNED_IN' && session) {
+        sessionToken = session.access_token;
+        updateUserUI(session.user);
+      }
+    });
+  }
+
+  function updateUserUI(user) {
+    const nameDisplay = document.getElementById("user-name-display");
+    const dropName = document.getElementById("user-dropdown-name");
+    const dropEmail = document.getElementById("user-dropdown-email");
+    
+    if (user) {
+      const name = user.user_metadata?.full_name || "User";
+      if (nameDisplay) nameDisplay.textContent = name;
+      if (dropName) dropName.textContent = name;
+      if (dropEmail) dropEmail.textContent = user.email;
+    } else {
+      if (nameDisplay) nameDisplay.textContent = "Guest";
+      if (dropName) dropName.textContent = "Guest User";
+      if (dropEmail) dropEmail.textContent = "Log in to save images";
+    }
+  }
+
+  const userProfileBtn = document.getElementById("user-profile-btn");
+  const userDropdownMenu = document.getElementById("user-dropdown-menu");
+  const btnSignout = document.getElementById("btn-signout");
+
+  if (userProfileBtn && userDropdownMenu) {
+    userProfileBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      userDropdownMenu.classList.toggle("hidden");
+    });
+    
+    document.addEventListener("click", (e) => {
+      if (!userProfileBtn.contains(e.target) && !userDropdownMenu.contains(e.target)) {
+        userDropdownMenu.classList.add("hidden");
+      }
+    });
+  }
+  
+  if (btnSignout) {
+    btnSignout.addEventListener("click", async () => {
+      sessionStorage.removeItem("guest_mode");
+      if (supabaseClient) {
+        await supabaseClient.auth.signOut();
+      } else {
+        window.location.replace("login.html");
+      }
+    });
+  }
+
   // ── THEME LOGIC ───────────────────────────────────────────
   const themeToggleBtn = document.getElementById("theme-toggle-btn");
   
@@ -34,21 +106,6 @@
     themeToggleBtn.addEventListener("click", () => {
       const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
       applyTheme(currentTheme === "light" ? "dark" : "light");
-    });
-  }
-
-  const loginBtn = document.getElementById("login-btn");
-  const closeLoginBtn = document.getElementById("close-login-btn");
-  const loginModalOverlay = document.getElementById("login-modal-overlay");
-
-  if (loginBtn && loginModalOverlay) {
-    loginBtn.addEventListener("click", () => {
-      loginModalOverlay.classList.remove("hidden");
-    });
-  }
-  if (closeLoginBtn && loginModalOverlay) {
-    closeLoginBtn.addEventListener("click", () => {
-      loginModalOverlay.classList.add("hidden");
     });
   }
 
@@ -680,7 +737,9 @@
   // ── CREDITS ───────────────────────────────────────────────
   async function fetchCredits() {
     try {
-      const res = await fetch(`${API_URL}/status`);
+      const headers = {};
+      if (sessionToken) headers["Authorization"] = `Bearer ${sessionToken}`;
+      const res = await fetch(`${API_URL}/status`, { headers });
       if (res.ok) {
         const data = await res.json();
         updateCreditsUI(data.remaining, data.daily_limit);
@@ -918,9 +977,11 @@
     const aiMsg = addMessage("ai", `Generating with ${modelName}${styleText}…`, { loading: true });
 
     try {
+      const headers = { "Content-Type": "application/json" };
+      if (sessionToken) headers["Authorization"] = `Bearer ${sessionToken}`;
       const res = await fetch(`${API_URL}/generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: headers,
         body: JSON.stringify({ 
           prompt: finalPrompt, 
           model: selectedModel,
@@ -1734,9 +1795,11 @@
     editAiApplyBtn.disabled = true;
     
     try {
+      const headers = { "Content-Type": "application/json" };
+      if (sessionToken) headers["Authorization"] = `Bearer ${sessionToken}`;
       const res = await fetch(`${API_URL}/edit`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: headers,
         body: JSON.stringify({
           image: dataUrl,
           prompt: prompt,

@@ -73,7 +73,14 @@ HF_API_KEY=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 > ⚠️ **Never commit your real API key.** The `.env` file should be in `.gitignore`.
 
-### 4. Start the Flask Server
+### 4. Set Up Supabase Auth
+
+1. Go to [Supabase](https://supabase.com/) and create a project.
+2. In Authentication > Settings, add your Site URL (e.g., `http://127.0.0.1:5500`) and Redirect URLs.
+3. Turn on "Confirm email" if you want users to verify their emails.
+4. Update `frontend/config.js` with your `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Guest mode can be toggled by changing `GUEST_MODE`.
+
+### 5. Start the Flask Server
 
 ```bash
 # From the backend/ directory with venv activated
@@ -82,13 +89,13 @@ python app.py
 
 The server will start at **http://127.0.0.1:5000**.
 
-### 5. Open the Frontend
+### 6. Open the Frontend
 
-Simply open `frontend/index.html` in your browser:
+We recommend using Live Server (especially for Supabase Auth redirects):
 
-- **Option A:** Double-click the file in your file explorer
-- **Option B:** Use Live Server in VS Code
-- **Option C:** Run `start frontend/index.html` (Windows) or `open frontend/index.html` (macOS)
+- **Option A:** Use the "Live Server" extension in VS Code to serve the `frontend/` folder.
+- **Option B:** Double-click `frontend/login.html` in your file explorer (note: some auth redirects require a server).
+- **Option C:** Run a simple python server in the frontend directory: `python -m http.server 5500`
 
 ---
 

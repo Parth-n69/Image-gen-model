@@ -24,6 +24,25 @@
     })();
   </script>
   <link rel="stylesheet" href="style.css" />
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>body { opacity: 0; transition: opacity 0.2s ease; }</style>
+  <script>
+    (async function() {
+      if (typeof window.supabase === 'undefined') return;
+      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data: { session } } = await client.auth.getSession();
+      const isGuest = sessionStorage.getItem('guest_mode') === 'true';
+      
+      if (!session && !isGuest) {
+        window.location.replace('login.html');
+      } else {
+        document.addEventListener("DOMContentLoaded", () => {
+          document.body.style.opacity = '1';
+        });
+      }
+    })();
+  </script>
 </head>
 <body>
 
@@ -52,7 +71,19 @@
         <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20" style="display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
       </button>
-      <button class="btn-secondary login-btn" id="login-btn">Login</button>
+      <div class="user-dropdown" id="user-dropdown-container">
+        <button class="btn-secondary login-btn" id="user-profile-btn" style="display: flex; gap: 8px; align-items: center;">
+          <span id="user-name-display">Guest</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="user-dropdown-menu hidden" id="user-dropdown-menu">
+          <div class="user-dropdown-info">
+            <strong id="user-dropdown-name">Guest User</strong>
+            <span id="user-dropdown-email" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 4px;"></span>
+          </div>
+          <button class="user-dropdown-item danger" id="btn-signout" style="width: 100%; text-align: left;">Sign out</button>
+        </div>
+      </div>
     </div>
   </header>
 
