@@ -26,7 +26,7 @@
       if (event === 'SIGNED_OUT') {
         sessionToken = null;
         window.location.replace("login.html");
-      } else if (event === 'SIGNED_IN' && session) {
+      } else if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session) {
         sessionToken = session.access_token;
         updateUserUI(session.user);
       }
@@ -435,7 +435,7 @@
 
   // ── STATE ─────────────────────────────────────────────────
   let isGenerating = false;
-  let selectedModel = "flux-schnell";
+  let selectedModel = localStorage.getItem('default_model') || "flux-schnell";
   let isChatActive = false;   // tracks whether we're in chat mode
   let activeTab = "generate"; // "generate" or "gallery"
   let galleryFilter = "all";  // "all" or "favorites"
@@ -478,8 +478,12 @@
   const negativePromptInput = document.getElementById("negative-prompt");
 
   let isOptionsOpen = false;
-  let activeStyle = "none";
-  let activeRatio = "1024x1024";
+  let activeStyle = localStorage.getItem('default_style') || "none";
+  let activeRatio = localStorage.getItem('default_aspect') || "1024x1024";
+
+  // Pre-select options based on loaded preferences
+  stylePresetsBtns.forEach(b => b.classList.toggle("active", b.dataset.style === activeStyle));
+  aspectRatioBtns.forEach(b => b.classList.toggle("active", b.dataset.ratio === activeRatio));
 
   optionsToggleBtns.forEach(btn => {
     btn.addEventListener("click", () => {

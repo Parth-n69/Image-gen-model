@@ -142,6 +142,15 @@ Every successful generation is **automatically saved** to your browser's Indexed
 - If IndexedDB is unavailable (e.g., in private browsing), the app still works — you just won't have persistent history. A warning toast will appear.
 - Data is stored locally in your browser only. Clearing browser data will remove your history.
 
+### Profile Page
+
+Logged-in users have access to a comprehensive Profile page featuring:
+- **Overview:** View your generation stats (from this device's local history), account age, and a customized avatar.
+- **Account:** Manage your full name and username.
+- **Security:** Change your password or sign out of all active sessions across devices. You can also securely wipe all local generation data.
+- **Preferences:** Set a default AI model, style preset, and aspect ratio which will automatically load into the Generate tab each time you use the app.
+
+
 ## 💎 Theming (Modern Luxury)
 
 The UI is built with a modern luxury aesthetic—minimalist, elegant, and highly customizable. All colors and sizing are controlled by CSS variables located in `frontend/style.css`.
